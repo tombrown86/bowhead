@@ -499,7 +499,7 @@ class Coinbase
 
         if($statusCode != 200) {
             print_r($response);
-            error_log('STATUS CODE', $statusCode . ' ' . $response);
+            error_log('STATUS CODE: '. $statusCode . ' ' . $response);
         }
         return array( "statusCode" => $statusCode, "body" => $response );
     }

@@ -70,18 +70,21 @@ class OandaStreamCommand extends Command
               continue;
             }
 
-            foreach ($results as $result) {
-              if (is_array($result)) {
-                foreach ($result as $price) {
+//            foreach ($results as $result) {
+//				  print_r($results);die;
+//              if (is_array($result)) {
+//                foreach ($result as $price) {
+				  $price = $results;
                   $ticker = [];
+				  
                   $ticker['tick']['bid'] = round(((float) $price->bids[0]->price + (float) $price->asks[0]->price) / 2, 5);
                   $ticker['tick']['instrument'] = $price->instrument;
                   $this->markOHLC($ticker);
                   $ins = $ticker['tick']['instrument'];
                   $curr[$ins] = (($price->bids[0]->price + $price->asks[0]->price)/2);
-                }
-              }
-            }
+//                }
+//              }
+//            }
 
             $output = [];
             foreach ($curr as $instrument => $bid) {
