@@ -1,7 +1,10 @@
-UPDATE FOR BITFINIX ISSUES (12/23/2017):
-ADDED IN https://github.com/ccxt/ccxt instead of custom wrapping all the api's
-Currently refactorng all of the code to use models for the database, ccxt for doing buys and sells and
- so forth. Adding in data seeds so strategies can be used right off the bat.
+UPDATE (1/06/2018):
+MORE Major changes:
+ Things are MORE THAN LIKELY BROKE because of the overhaul. I will need some Coinigy testers as I have built a web configuration for Bowhead where you select Coinigy (easy start) or CCXT and then the exchanges and select your trading pairs.
+ 
+ HIT UP THE Gitter below and I will be posting info there.
+ 
+ Also, working on an official Docker pull for this off DockerHub and a companion YouTube tutorial for setting it up in on both Mac and AWS (sorry windows folk). If you have sent me an email, I am sorry... I can answer 150 emails about Bowhead or I can get new features for Bowhead done, but not both. I am trying to go through the issues here and am going to clean them all out once the newer web interface is wrapped. (yes.. a web interface!!!!)
 
 
 # bowhead
@@ -30,7 +33,14 @@ having to deal with some potential tax issues (depending on the country you live
 #### Companion article
 This project has a companion article which walks you through how to set it up and walks you through 
 setting up your first strategy and running it on [Whaleclub](https://whaleclub.co/join/tn6uE) 
-and on [1Broker](https://1broker.com/?r=21434), which you will need accounts on both.
+and on [1Broker](https://1broker.com/?r=21434), which you will need accounts on both. 
+Additionally the following are recommended exchnges:
+* [Binance](https://www.binance.com/?ref=12325729)
+* [Coinbase/GDAX](https://www.coinbase.com/join/51950ca286c21b84dd000021)
+* [Kraken](https://www.kraken.com)
+* [CEX](https://cex.io/r/0/joeldg/0/)
+
+Usage of [Coinigy](https://www.coinigy.com/?r=32d4c701)(free 1-month trial) also is being added.
  
 The companion article is on Medum and is:
 
