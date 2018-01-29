@@ -10,7 +10,7 @@ use Bowhead\Models;
 
 class DataRunnerCoinigyCommand extends Command
 {
-    use DataCoinigy, Config;
+    use DataCoinigy, Config, \Bowhead\Traits\OHLC;
 
     /**
      * @var string
@@ -55,6 +55,7 @@ class DataRunnerCoinigyCommand extends Command
         if ($this->bowhead_config('COINIGY') == 0){
             exit(1);
         }
+		
         #$coinigy = new Coinigy();
         while (1) {
             $exchanges = $tick = $bh_exchanges = [];
@@ -70,6 +71,7 @@ class DataRunnerCoinigyCommand extends Command
             foreach ($exchanges as $code => $ex) {
                 foreach ($trading_pairs as $pair) {
                     $ticker = $this->get_ticker($code, $pair);
+print_r($ticker);
                     if (!empty($ticker['err_msg'])) {
                         continue;
                     } else {
@@ -85,10 +87,25 @@ class DataRunnerCoinigyCommand extends Command
                     $tick['timestamp']       = time();
                     $tick['bh_exchanges_id'] = $bh_exchanges[$code];
                     $tick['datetime']        = $ticker['timestamp'];
-                    $tickers_model           = new Models\bh_tickers();
-                    $tickers_model::updateOrCreate(
-                        ['bh_exchanges_id' => $bh_exchanges[$code], 'symbol' => $pair, 'timestamp' => $tick['timestamp']]
-                        , $tick);
+					
+//					print_r($tick);
+					$this->markOHLC([
+
+						'ctime' => date('Y-m-d H:i:s')
+						, 'timeid' => date('YmdHis')
+						, 'open' => $ticker['last_trade']
+						, 'high' => $ticker['high_trade']
+						, 'low' => $ticker['low_trade']
+						, 'close' => $ticker['last_trade']
+						, 'volume' => $ticker['current_volume']
+						, 'volume2' => 0
+					]);
+//					
+//                    $tickers_model           = new Models\bh_tickers();
+//                    $tickers_model::updateOrCreate(
+//                        ['bh_exchanges_id' => $bh_exchanges[$code], 'symbol' => $pair, 'timestamp' => $tick['timestamp']]
+//                        , $tick);
+					
                 }
             }
 

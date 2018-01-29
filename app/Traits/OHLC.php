@@ -18,34 +18,55 @@ trait OHLC
      */
     public function markOHLC($ticker, $bf = false, $bf_pair = 'BTC/USD')
     {
-        $timeid = date('YmdHis'); // 20170530152259 unique for date
-        if ($bf) {
-            /** Bitfinex websocked */
-            $last_price = $ticker[7];
-            $volume = $ticker[8];
-            $instrument = $bf_pair;
+//		if($bf == 'raw') {
+			$instrument = $bf_pair;
+			extract($ticker);
+			$now = strtotime($ctime);
+			
+			/** tick table update */
+			$ins = \DB::insert("
+				INSERT INTO bowhead_ohlc_tick
+				(`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`, volume2, ctime)
+				VALUES
+				('$bf_pair', $timeid, $open, $high, $low, $close, $volume, $volume2, '$ctime')
+				ON DUPLICATE KEY UPDATE
+				`high`   = CASE WHEN `high` < VALUES(`high`) THEN VALUES(`high`) ELSE `high` END,
+				`low`    = CASE WHEN `low` > VALUES(`low`) THEN VALUES(`low`) ELSE `low` END,
+				`volume` = VALUES(`volume`),
+				`close`  = VALUES(`close`)
+			");
+//		} /*else {
+//			$now = time();
+//			$timeid = date('YmdHis'); // 20170530152259 unique for date
+//			if ($bf) {
+//				/** Bitfinex websocked */
+//				$last_price = $ticker[7];
+//				$volume = $ticker[8];
+//				$instrument = $bf_pair;
+//
+//				/** if timeid passed, we use it, otherwise use generated one.. */
+//				$timeid = ($ticker['timeid'] ?? $timeid);
+//			} else {
+//				/** Oanda websocket */
+//				$last_price = $ticker['tick']['bid'];
+//				$instrument = $ticker['tick']['instrument'];
+//				$volume = 0;
+//			}
+//			
+//			/** tick table update */
+//			$ins = \DB::insert("
+//				INSERT INTO bowhead_ohlc_tick
+//				(`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`)
+//				VALUES
+//				('$instrument', $timeid, $last_price, $last_price, $last_price, $last_price, $volume)
+//				ON DUPLICATE KEY UPDATE
+//				`high`   = CASE WHEN `high` < VALUES(`high`) THEN VALUES(`high`) ELSE `high` END,
+//				`low`    = CASE WHEN `low` > VALUES(`low`) THEN VALUES(`low`) ELSE `low` END,
+//				`volume` = VALUES(`volume`),
+//				`close`  = VALUES(`close`)
+//			");
+//		}
 
-            /** if timeid passed, we use it, otherwise use generated one.. */
-            $timeid = ($ticker['timeid'] ?? $timeid);
-        } else {
-            /** Oanda websocket */
-            $last_price = $ticker['tick']['bid'];
-            $instrument = $ticker['tick']['instrument'];
-            $volume = 0;
-        }
-
-        /** tick table update */
-        $ins = \DB::insert("
-            INSERT INTO bowhead_ohlc_tick
-            (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`)
-            VALUES
-            ('$instrument', $timeid, $last_price, $last_price, $last_price, $last_price, $volume)
-            ON DUPLICATE KEY UPDATE
-            `high`   = CASE WHEN `high` < VALUES(`high`) THEN VALUES(`high`) ELSE `high` END,
-            `low`    = CASE WHEN `low` > VALUES(`low`) THEN VALUES(`low`) ELSE `low` END,
-            `volume` = VALUES(`volume`),
-            `close`  = VALUES(`close`)
-        ");
 
         /** 1m table update **/
 
@@ -53,7 +74,7 @@ trait OHLC
         $close1 = null;
         $high1 = null;
         $low1 = null;
-
+		$last1timeid=0;
         $timeid = date("YmdHi", strtotime($timeid));
 
         $last1m = \DB::table('bowhead_ohlc_1m')->select(DB::raw('MAX(timeid) AS timeid'))
@@ -68,7 +89,7 @@ trait OHLC
         if ($last1timeid < $timeid) {
 
             /* Get High and Low from ticker data for insertion */
-            $last1timeids = date("YmdHis", strtotime(date("YmdHi", strtotime("-1 minutes", strtotime("now")))));
+            $last1timeids = date("YmdHis", strtotime(date("YmdHi", strtotime("-1 minutes", $now))));
             $accum1ma = \DB::table('bowhead_ohlc_tick')->select(DB::raw('MAX(high) as high, MIN(low) as low'))
                 ->where('instrument', $instrument)
                 ->where('timeid', '>=', $last1timeids)
@@ -106,13 +127,14 @@ trait OHLC
                 $close1 = $accum1c->close;
             }
 
-
+//die("$open1 $close1 ");
             if ($open1 && $close1 && $high1 && $low1) {
+			
                 $ins = \DB::insert("
             INSERT INTO bowhead_ohlc_1m 
-            (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`)
+            (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`, ctime)
             VALUES
-            ('$instrument', $timeid, $open1, $high1, $low1, $close1, $volume)
+            ('$instrument', $timeid, $open1, $high1, $low1, $close1, $volume, '$ctime')
             ON DUPLICATE KEY UPDATE 
             `high`   = CASE WHEN `high` < VALUES(`high`) THEN VALUES(`high`) ELSE `high` END,
             `low`    = CASE WHEN `low` > VALUES(`low`) THEN VALUES(`low`) ELSE `low` END,
@@ -139,7 +161,7 @@ trait OHLC
         }
         if ($last5timeid < $timeid) {
             /* Get High and Low from 1m data for insertion */
-            $last5timeids = date("YmdHi", strtotime("-5 minutes", strtotime("now")));
+            $last5timeids = date("YmdHi", strtotime("-5 minutes", $now));
             $accum5ma = \DB::table('bowhead_ohlc_1m')->select(DB::raw('MAX(high) as high, MIN(low) as low'))
                 ->where('instrument', $instrument)
                 ->where('timeid', '>=', $last5timeids)
@@ -176,9 +198,9 @@ trait OHLC
             if ($open5 && $close5 && $low5 && $high5) {
                 $ins = \DB::insert("
             INSERT INTO bowhead_ohlc_5m 
-            (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`)
+            (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`, ctime)
             VALUES
-            ('$instrument', $timeid, $open5, $high5, $low5, $close5, $volume)
+            ('$instrument', $timeid, $open5, $high5, $low5, $close5, $volume, '$ctime')
             ON DUPLICATE KEY UPDATE 
             `high`   = CASE WHEN `high` < VALUES(`high`) THEN VALUES(`high`) ELSE `high` END,
             `low`    = CASE WHEN `low` > VALUES(`low`) THEN VALUES(`low`) ELSE `low` END,
@@ -203,7 +225,7 @@ trait OHLC
         }
         if ($last15timeid < $timeid) {
             /* Get High and Low from 5m data for insertion */
-            $last15timeids = date("YmdHi", strtotime("-15 minutes", strtotime("now")));
+            $last15timeids = date("YmdHi", strtotime("-15 minutes", $now));
             $accum15ma = \DB::table('bowhead_ohlc_5m')->select(DB::raw('MAX(high) as high, MIN(low) as low'))
                 ->where('instrument', $instrument)
                 ->where('timeid', '>=', $last15timeids)
@@ -240,9 +262,9 @@ trait OHLC
             if ($open15 && $close15 && $low15 && $high15) {
                 $ins = \DB::insert("
             INSERT INTO bowhead_ohlc_15m 
-            (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`)
+            (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`, ctime)
             VALUES
-            ('$instrument', $timeid, $open15, $high15, $low15, $close15, $volume)
+            ('$instrument', $timeid, $open15, $high15, $low15, $close15, $volume, '$ctime')
             ON DUPLICATE KEY UPDATE 
             `high`   = CASE WHEN `high` < VALUES(`high`) THEN VALUES(`high`) ELSE `high` END,
             `low`    = CASE WHEN `low` > VALUES(`low`) THEN VALUES(`low`) ELSE `low` END,
@@ -267,7 +289,7 @@ trait OHLC
         }
         if ($last30timeid < $timeid) {
             /* Get High and Low from 15m data for insertion */
-            $last30timeids = date("YmdHi", strtotime("-30 minutes", strtotime("now")));
+            $last30timeids = date("YmdHi", strtotime("-30 minutes", $now));
             $accum30ma = \DB::table('bowhead_ohlc_15m')->select(DB::raw('MAX(high) as high, MIN(low) as low'))
                 ->where('instrument', $instrument)
                 ->where('timeid', '>=', $last30timeids)
@@ -304,9 +326,9 @@ trait OHLC
             if ($open30 && $close30 && $low30 && $high30) {
                 $ins = \DB::insert("
             INSERT INTO bowhead_ohlc_30m 
-            (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`)
+            (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`, ctime)
             VALUES
-            ('$instrument', $timeid, $open30, $high30, $low30, $close30, $volume)
+            ('$instrument', $timeid, $open30, $high30, $low30, $close30, $volume, '$ctime')
             ON DUPLICATE KEY UPDATE 
             `high`   = CASE WHEN `high` < VALUES(`high`) THEN VALUES(`high`) ELSE `high` END,
             `low`    = CASE WHEN `low` > VALUES(`low`) THEN VALUES(`low`) ELSE `low` END,
@@ -331,7 +353,7 @@ trait OHLC
         }
         if ($last60timeid < $timeid) {
             /* Get High and Low from 30m data for insertion */
-            $last60timeids = date("YmdHi", strtotime("-60 minutes", strtotime("now")));
+            $last60timeids = date("YmdHi", strtotime("-60 minutes", $now));
             $accum60ma = \DB::table('bowhead_ohlc_30m')->select(DB::raw('MAX(high) as high, MIN(low) as low'))
                 ->where('instrument', $instrument)
                 ->where('timeid', '>=', $last60timeids)
@@ -368,9 +390,9 @@ trait OHLC
             if ($open60 && $close60 && $low60 && $high60) {
                 $ins = \DB::insert("
             INSERT INTO bowhead_ohlc_1h 
-            (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`)
+            (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`, ctime)
             VALUES
-            ('$instrument', $timeid, $open60, $high60, $low60, $close60, $volume)
+            ('$instrument', $timeid, $open60, $high60, $low60, $close60, $volume, '$ctime')
             ON DUPLICATE KEY UPDATE 
             `high`   = CASE WHEN `high` < VALUES(`high`) THEN VALUES(`high`) ELSE `high` END,
             `low`    = CASE WHEN `low` > VALUES(`low`) THEN VALUES(`low`) ELSE `low` END,
@@ -411,6 +433,32 @@ trait OHLC
         }
         return $ret;
     }
+	
+	public function getWinOrLoose ($instrument, $time, $etime, $long, $take, $stop) {
+			$outcome_resultset = \DB::table('bowhead_ohlc_tick')->select(DB::raw('*'))
+                ->where('instrument', $instrument)
+                ->where('ctime', '>', date('Y-m-d H:i:s', $time))
+                ->where('ctime', '<', date('Y-m-d H:i:s', $etime))
+                ->where(function($q) use ($long, $take, $stop) {
+					$q->where('high', '>=', $long ? $take : $stop)
+					  ->orWhere('low', '<=', $long ? $stop : $take);
+				})
+                ->orderBy('ctime')
+                ->limit(1)
+                ->get();
+            foreach ($outcome_resultset as $outcome) {
+//				print_r(func_get_args());
+//				print_r($outcome);
+                return [
+					'win' => !($long ? $outcome->low < $stop : $outcome->high > $stop),
+					'time' => strtotime($outcome->ctime),
+				];
+            }
+			return [
+				'win' => false,
+				'time' => $etime,
+			];
+	}
 
     /**
      * @param string $pair
@@ -422,23 +470,27 @@ trait OHLC
      *
      * @return array
      */
-    public function getRecentData($pair='BTC/USD', $limit=168, $day_data=false, $hour=12, $periodSize='1m', $returnRS=false)
+    public function getRecentData($pair='BTC/USD', $limit=168, $day_data=false, $hour=12, $periodSize='1m', $returnRS=false, $current_time=null)
     {
         /**
          *  we need to cache this as many strategies will be
          *  doing identical pulls for signals.
          */
         $key = 'recent::'.$pair.'::'.$limit."::$day_data::$hour::$periodSize";
-        if(\Cache::has($key)) {
-            return \Cache::get($key);
-        }
+	//        if(\Cache::has($key)) {
+	//            return \Cache::get($key);
+	//        }
 
+		$current_time = $current_time ? $current_time : time();
         $a = \DB::table('bowhead_ohlc_'.$periodSize)
             ->select(DB::raw('*, unix_timestamp(ctime) as buckettime'))
             ->where('instrument', $pair)
+			->where('timeid', '<=', date('YmdHi', $current_time))
             ->orderby('timeid', 'DESC')
             ->limit($limit)
             ->get();
+
+	echo  date(' Y-m-d H:i:s ', $current_time)."\n";
 
         if ($returnRS) {
             $ret = $a;
@@ -446,41 +498,47 @@ trait OHLC
             $ret = $this->organizePairData($a);
         }
 
-	$ptime = null;
-	$validperiods = 0;
-	foreach ($a as $ab) {
-	   #echo print_r($ab,1);
-	   $array = (array) $ab;
-	   $ftime = $array['buckettime'];
-	   if ($ptime == null) {
-	      $ptime = $ftime;
-		  echo "Starting at $array[ctime]...\n";
-	   } else {
-	 	/** Check for missing periods **/
-		if ($periodSize == '1m') {
-		   $variance = (int)80;
-		} else if ($periodSize == '5m') {
-		   $variance = (int)375;
-		} else if ($periodSize == '15m') {
-		   $variance = (int)1125;
-		} else if ($periodSize == '30m') {
-		   $variance = (int)2250;
-		} else if ($periodSize == '1h') {
-		   $variance = (int)4500;
-		} else if ($periodSize == '1d') {
-		   $variance = (int)108000;
+		$ptime = null;
+		$validperiods = 0;
+		foreach ($a as $ab) {
+		   #echo print_r($ab,1);
+		   $array = (array) $ab;
+		   $ftime = $array['buckettime'];
+			if ($periodSize == '1m') {
+			   $variance = (int)100;
+			} else if ($periodSize == '5m') {
+			   $variance = (int)375;
+			} else if ($periodSize == '15m') {
+			   $variance = (int)1125;
+			} else if ($periodSize == '30m') {
+			   $variance = (int)2250;
+			} else if ($periodSize == '1h') {
+			   $variance = (int)4500;
+			} else if ($periodSize == '1d') {
+			   $variance = (int)108000;
+			}
+			
+		   if ($ptime == null) {
+			  $ptime = $ftime;
+	//		  echo "Starting at $array[ctime]...\n";
+ 			  if($ptime+$variance < $current_time) {
+			      die("Most recent data is too old");
+			  }
+		   } else {
+			/** Check for missing periods **/
+			
+			#echo 'Past Time is '.$ptime.' and current time is '.$ftime."\n";
+			$periodcheck = $ptime - $ftime;
+			if ((int)$periodcheck > (int)$variance) {
+				echo $periodcheck . ' > ' . $variance.' ' .date('Y-m-d H i s',$ftime) . '  YOU HAVE '.$validperiods.' PERIODS OF VALID PRICE DATA OUT OF '.$limit.'. Please ensure price sync is running and wait for additional data to be logged before trying again. Additionally you could use a smaller time period if available.'."\n";
+				die();
+			}	
+			$validperiods++;
+		   }
+		   $ptime = $ftime;	
 		}
-		#echo 'Past Time is '.$ptime.' and current time is '.$ftime."\n";
-		$periodcheck = $ptime - $ftime;
-		if ((int)$periodcheck > (int)$variance) {
-			echo 'YOU HAVE '.$validperiods.' PERIODS OF VALID PRICE DATA OUT OF '.$limit.'. Please ensure price sync is running and wait for additional data to be logged before trying again. Additionally you could use a smaller time period if available.'."\n";
-			die();
-		}	
-		$validperiods++;
-	   }
-	   $ptime = $ftime;	
-	}
-
+//		echo date('Y-m-d H:i:s', $ptime);
+		
         \Cache::put($key, $ret, 2);
         return $ret;
     }

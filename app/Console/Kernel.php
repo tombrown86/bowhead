@@ -33,6 +33,10 @@ class Kernel extends ConsoleKernel
         Commands\RandomWalkCommand::class,
         Commands\FxStreamCommand::class,
 		Commands\KrakenStreamCommand::class,
+		Commands\WhaleClubFromTradingViewSignal::class,
+		Commands\BitcoinchartsBackfillCommand::class,
+		Commands\EvaluateStrategiesCommand::class,
+		Commands\WhaleClubExperimentCommand::class,
     ];
 
     /**

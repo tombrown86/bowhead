@@ -1130,6 +1130,7 @@ class Indicators
             $uptrend   += ($a_wma4[$a] > $a_htl[$a] ? 1 : 0);
             $downtrend += ($a_wma4[$a] < $a_htl[$a] ? 1 : 0);
 
+			if(!$a_htl[$a]) {return 0;};
             $declared = (($a_wma4[$a]-$a_htl[$a])/$a_htl[$a]);
         }
         if ($uptrend || $declared >= 0.15) {
