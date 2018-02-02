@@ -22,7 +22,7 @@ trait OHLC
 			$instrument = $bf_pair;
 			extract($ticker);
 			$now = strtotime($ctime);
-			
+
 			/** tick table update */
 			$ins = \DB::insert("
 				INSERT INTO bowhead_ohlc_tick
@@ -74,11 +74,12 @@ trait OHLC
         $close1 = null;
         $high1 = null;
         $low1 = null;
-		$last1timeid=0;
+	$last1timeid=0;
         $timeid = date("YmdHi", strtotime($timeid));
 
         $last1m = \DB::table('bowhead_ohlc_1m')->select(DB::raw('MAX(timeid) AS timeid'))
             ->where('instrument', $instrument)
+            ->where('timeid', '<', $timeid)
             ->get();
 
         foreach ($last1m as $last1) {
@@ -154,6 +155,7 @@ trait OHLC
 
         $last5m = \DB::table('bowhead_ohlc_5m')->select(DB::raw('MAX(timeid) AS timeid'))
             ->where('instrument', $instrument)
+            ->where('timeid', '<', $timeid)
             ->get();
         foreach ($last5m as $last5) {
             $last5timeid = $last5->timeid;
@@ -218,6 +220,7 @@ trait OHLC
 
         $last15m = \DB::table('bowhead_ohlc_15m')->select(DB::raw('MAX(timeid) AS timeid'))
             ->where('instrument', $instrument)
+            ->where('timeid', '<', $timeid)
             ->get();
         foreach ($last15m as $last15) {
             $last15timeid = $last15->timeid;
@@ -282,6 +285,7 @@ trait OHLC
 
         $last30m = \DB::table('bowhead_ohlc_30m')->select(DB::raw('MAX(timeid) AS timeid'))
             ->where('instrument', $instrument)
+            ->where('timeid', '<', $timeid)
             ->get();
         foreach ($last30m as $last30) {
             $last30timeid = $last30->timeid;
@@ -346,6 +350,7 @@ trait OHLC
 
         $last60m = \DB::table('bowhead_ohlc_1h')->select(DB::raw('MAX(timeid) AS timeid'))
             ->where('instrument', $instrument)
+            ->where('timeid', '<', $timeid)
             ->get();
         foreach ($last60m as $last60) {
             $last60timeid = $last60->timeid;
@@ -435,17 +440,17 @@ trait OHLC
     }
 	
 	public function getWinOrLoose ($instrument, $time, $etime, $long, $take, $stop) {
-			$outcome_resultset = \DB::table('bowhead_ohlc_tick')->select(DB::raw('*'))
-                ->where('instrument', $instrument)
-                ->where('ctime', '>', date('Y-m-d H:i:s', $time))
-                ->where('ctime', '<', date('Y-m-d H:i:s', $etime))
-                ->where(function($q) use ($long, $take, $stop) {
+		$outcome_resultset = \DB::table('bowhead_ohlc_tick')->select(DB::raw('*'))
+                	->where('instrument', $instrument)
+	                ->where('ctime', '>', date('Y-m-d H:i:s', $time))
+	                ->where('ctime', '<', date('Y-m-d H:i:s', $etime))
+	                ->where(function($q) use ($long, $take, $stop) {
 					$q->where('high', '>=', $long ? $take : $stop)
 					  ->orWhere('low', '<=', $long ? $stop : $take);
 				})
-                ->orderBy('ctime')
-                ->limit(1)
-                ->get();
+        	        ->orderBy('ctime')
+	                ->limit(1)
+	                ->get();
             foreach ($outcome_resultset as $outcome) {
 //				print_r(func_get_args());
 //				print_r($outcome);
@@ -470,76 +475,79 @@ trait OHLC
      *
      * @return array
      */
-    public function getRecentData($pair='BTC/USD', $limit=168, $day_data=false, $hour=12, $periodSize='1m', $returnRS=false, $current_time=null)
+    public function getRecentData($pair='BTC/USD', $limit=168, $day_data=false, $hour=12, $periodSize='1m', $returnRS=false, $current_time=null, $die_on_large_period=TRUE)
     {
         /**
          *  we need to cache this as many strategies will be
          *  doing identical pulls for signals.
          */
         $key = 'recent::'.$pair.'::'.$limit."::$day_data::$hour::$periodSize";
-	//        if(\Cache::has($key)) {
-	//            return \Cache::get($key);
-	//        }
 
-		$current_time = $current_time ? $current_time : time();
+	// TODO improved caching
+	if ($periodSize == '1m') {
+	   $variance = (int)200;
+	} else if ($periodSize == '5m') {
+	   $variance = (int)375;
+	} else if ($periodSize == '15m') {
+	   $variance = (int)1125;
+	} else if ($periodSize == '30m') {
+	   $variance = (int)2250;
+	} else if ($periodSize == '1h') {
+	   $variance = (int)4500;
+	} else if ($periodSize == '1d') {
+	   $variance = (int)108000;
+	}
+
+
+
+	$current_time = $current_time ? $current_time : time();
         $a = \DB::table('bowhead_ohlc_'.$periodSize)
             ->select(DB::raw('*, unix_timestamp(ctime) as buckettime'))
             ->where('instrument', $pair)
-			->where('timeid', '<=', date('YmdHi', $current_time))
+        	->where('timeid', '<=', date('YmdHi', $current_time))
             ->orderby('timeid', 'DESC')
             ->limit($limit)
             ->get();
+	echo  'getRecentData: '. date(' Y-m-d H:i:s ', $current_time)."\n";
 
-	echo  date(' Y-m-d H:i:s ', $current_time)."\n";
+	$periods = [];
+	$ptime = null;
+	$validperiods = 0;
 
+
+	foreach ($a as $ab) {
+	   $array = (array) $ab;
+	   $array['buckettime'] = strtotime($array['ctime']); // since mysql unix_timestamp attempt was returning timestamps an hour out (maybe due to BST?)
+
+	   $ftime = $array['buckettime'];
+	   if ($ptime == null) {
+		  $ptime = $ftime;
+ 		  $periodcheck = $current_time - $ptime;
+		  if($periodcheck > $variance) {
+		      echo "Most recent data is too old... \$periodcheck > \$variance ($periodcheck > $variance) ... \$current_time=$current_time, \$ptime=$ptime, \$variance=$variance)";
+		      $die_on_large_period && die();
+		  }
+		  $periods[] = $periodcheck;
+	   } else {
+		/** Check for missing periods **/
+		#echo 'Past Time is '.$ptime.' and current time is '.$ftime."\n";
+		$periodcheck = $ptime - $ftime;
+		if ((int)$periodcheck > (int)$variance) {
+			echo $periodcheck . ' > ' . $variance.' ' .date('Y-m-d H i s',$ftime) . '  YOU HAVE '.$validperiods.' PERIODS OF VALID PRICE DATA OUT OF '.$limit.'. Please ensure price sync is running and wait for additional data to be logged before trying again. Additionally you could use a smaller time period if available.'."\n";
+			$die_on_large_period && die();
+		}
+                $periods[] = $periodcheck;
+		$validperiods++;
+	   }
+	   $ptime = $ftime;	
+	}
         if ($returnRS) {
-            $ret = $a;
+       	    $ret = $a;
         } else {
             $ret = $this->organizePairData($a);
-        }
-
-		$ptime = null;
-		$validperiods = 0;
-		foreach ($a as $ab) {
-		   #echo print_r($ab,1);
-		   $array = (array) $ab;
-		   $ftime = $array['buckettime'];
-			if ($periodSize == '1m') {
-			   $variance = (int)100;
-			} else if ($periodSize == '5m') {
-			   $variance = (int)375;
-			} else if ($periodSize == '15m') {
-			   $variance = (int)1125;
-			} else if ($periodSize == '30m') {
-			   $variance = (int)2250;
-			} else if ($periodSize == '1h') {
-			   $variance = (int)4500;
-			} else if ($periodSize == '1d') {
-			   $variance = (int)108000;
-			}
-			
-		   if ($ptime == null) {
-			  $ptime = $ftime;
-	//		  echo "Starting at $array[ctime]...\n";
- 			  if($ptime+$variance < $current_time) {
-			      die("Most recent data is too old");
-			  }
-		   } else {
-			/** Check for missing periods **/
-			
-			#echo 'Past Time is '.$ptime.' and current time is '.$ftime."\n";
-			$periodcheck = $ptime - $ftime;
-			if ((int)$periodcheck > (int)$variance) {
-				echo $periodcheck . ' > ' . $variance.' ' .date('Y-m-d H i s',$ftime) . '  YOU HAVE '.$validperiods.' PERIODS OF VALID PRICE DATA OUT OF '.$limit.'. Please ensure price sync is running and wait for additional data to be logged before trying again. Additionally you could use a smaller time period if available.'."\n";
-				die();
-			}	
-			$validperiods++;
-		   }
-		   $ptime = $ftime;	
-		}
-//		echo date('Y-m-d H:i:s', $ptime);
-		
-        \Cache::put($key, $ret, 2);
+	    $ret['periods'] = array_reverse($periods);
+	}
+        //todo: \Cache::put($key, $ret, 2);
         return $ret;
     }
 }

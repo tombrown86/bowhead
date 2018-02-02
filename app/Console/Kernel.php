@@ -37,6 +37,8 @@ class Kernel extends ConsoleKernel
 		Commands\BitcoinchartsBackfillCommand::class,
 		Commands\EvaluateStrategiesCommand::class,
 		Commands\WhaleClubExperimentCommand::class,
+		Commands\HistDataBackfillCommand::class,
+		Commands\EvaluateStrategies2Command::class,
     ];
 
     /**

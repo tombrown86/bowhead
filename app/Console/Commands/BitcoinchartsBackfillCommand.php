@@ -61,8 +61,8 @@ class BitcoinchartsBackfillCommand extends Command
         #\Cache::flush();
         #\DB::insert("DELETE FROM orca_bitfinex_ohlc WHERE instrument = 'BTC/USD'");
 $c=0;
-$enddate = strtotime('2018-01-27 23:00:00');
-$date = strtotime('2017-12-01');
+$enddate = strtotime('2017-06-01 00:00:00');
+$date = strtotime('2017-03-26 01:01:00');
 $bad=0;
 		for($i=$date; $i<$enddate; $i=strtotime('+1 day', $i)) {
 			$date = date('Y-m-d', $i);
