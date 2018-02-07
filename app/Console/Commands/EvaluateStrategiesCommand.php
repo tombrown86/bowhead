@@ -214,46 +214,45 @@ class EvaluateStrategiesCommand extends Command {
 										'total_loses' => 0,
 										'long_correct_trend' => [],
 										'long_wrong_trend' => [],
-//                                                                                        'long_correct_candle' => [],
-//                                                                                        'long_wrong_candle' => [],
+                                                                                'long_correct_candle' => [],
+                                                                                'long_wrong_candle' => [],
 										'short_correct_trend' => [],
 										'short_wrong_trend' => [],
-//                                                                                        'short_correct_candle' => [],
-//                                                                                        'short_wrong_candle' => [],
+                                                                                'short_correct_candle' => [],
+                                                                                'short_wrong_candle' => [],
 										'% win' => 0,
 									];
 								}
 
 								$prefix = $long ? 'long_' : 'short';
-//										if(isset($candles['current'])) {
-//											foreach ($candles['current'] as $candle_name => $candle_value) {
-//												if(($candle_value > 0 && $result['win']) || ($candle_value < 0 && !$result['win'])) {
-//
-//													if(!isset($results[$strategy_name][$prefix.'correct_candle'][$candle_name])) {
-//														$results[$strategy_name][$prefix.'correct_candle'][$candle_name] = 1;
-//													} else {
-//														 $results[$strategy_name][$prefix.'correct_candle'][$candle_name];
-//													}
-//												}
-//												if(($candle_value > 0 && !$result['win']) || ($candle_value < 0 && $result['win'])) {
-//														if(!isset($results[$strategy_name][$prefix.'wrong_candle'][$candle_name])) {
-//																$results[$strategy_name][$prefix.'wrong_candle'][$candle_name] = 1;
-//														} else {   
-//																 $results[$strategy_name][$prefix.'wrong_candle'][$candle_name]++;
-//														}
-//												}
-//											}										
-//										}
+								if(isset($candles['current'])) {
+									foreach ($candles['current'] as $candle_name => $candle_value) {
+										if(($long && $candle_value > 0 && $result['win']) || (!$long && $candle_value < 0 && !$result['win'])) {
+											if(!isset($results[$strategy_name][$prefix.'correct_candle'][$candle_name])) {
+												$results[$strategy_name][$prefix.'correct_candle'][$candle_name] = 1;
+											} else {
+												 $results[$strategy_name][$prefix.'correct_candle'][$candle_name];
+											}
+										}
+										if(($long && $candle_value > 0 && !$result['win']) || (!$long && $candle_value < 0 && $result['win'])) {
+												if(!isset($results[$strategy_name][$prefix.'wrong_candle'][$candle_name])) {
+														$results[$strategy_name][$prefix.'wrong_candle'][$candle_name] = 1;
+												} else {   
+														 $results[$strategy_name][$prefix.'wrong_candle'][$candle_name]++;
+												}
+										}
+									}
+								}
 								foreach ($trends[$instrument] as $trend_name => $trend_value) {
 									if ($trend_value != 0) {
-										if (($trend_value > 0 && $result['win']) || ($trend_value < 0 && !$result['win'])) {
+										if (($long && $trend_value > 0 && $result['win']) || (!$long && $trend_value < 0 && !$result['win'])) {
 											if (!isset($results[$strategy_name][$prefix . 'correct_trend'][$trend_name])) {
 												$results[$strategy_name][$prefix . 'correct_trend'][$trend_name] = 1;
 											} else {
 												$results[$strategy_name][$prefix . 'correct_trend'][$trend_name];
 											}
 										}
-										if (($trend_value > 0 && !$result['win']) || ($trend_value < 0 && $result['win'])) {
+										if (($long && $trend_value > 0 && !$result['win']) || (!$long && $trend_value < 0 && $result['win'])) {
 											if (!isset($results[$strategy_name][$prefix . 'wrong_trend'][$trend_name])) {
 												$results[$strategy_name][$prefix . 'wrong_trend'][$trend_name] = 1;
 											} else {
