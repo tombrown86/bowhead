@@ -77,7 +77,7 @@ class HistDataBackfillCommand extends Command {
 //					, 'weighted_price' => $d[7]
 					];
 //					print_r($row);
-					$this->markOHLC($row, 'backfill', 'EUR/USD');
+					$this->markOHLC($row, 'raw', 'EUR/USD');
 				}
 			}
 	}

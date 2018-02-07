@@ -18,7 +18,7 @@ trait OHLC
      */
     public function markOHLC($ticker, $bf = false, $bf_pair = 'BTC/USD')
     {
-//		if($bf == 'raw') {
+		if($bf == 'raw') {
 			$instrument = $bf_pair;
 			extract($ticker);
 			$now = strtotime($ctime);
@@ -35,37 +35,38 @@ trait OHLC
 				`volume` = VALUES(`volume`),
 				`close`  = VALUES(`close`)
 			");
-//		} /*else {
-//			$now = time();
-//			$timeid = date('YmdHis'); // 20170530152259 unique for date
-//			if ($bf) {
-//				/** Bitfinex websocked */
-//				$last_price = $ticker[7];
-//				$volume = $ticker[8];
-//				$instrument = $bf_pair;
-//
-//				/** if timeid passed, we use it, otherwise use generated one.. */
-//				$timeid = ($ticker['timeid'] ?? $timeid);
-//			} else {
-//				/** Oanda websocket */
-//				$last_price = $ticker['tick']['bid'];
-//				$instrument = $ticker['tick']['instrument'];
-//				$volume = 0;
-//			}
-//			
-//			/** tick table update */
-//			$ins = \DB::insert("
-//				INSERT INTO bowhead_ohlc_tick
-//				(`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`)
-//				VALUES
-//				('$instrument', $timeid, $last_price, $last_price, $last_price, $last_price, $volume)
-//				ON DUPLICATE KEY UPDATE
-//				`high`   = CASE WHEN `high` < VALUES(`high`) THEN VALUES(`high`) ELSE `high` END,
-//				`low`    = CASE WHEN `low` > VALUES(`low`) THEN VALUES(`low`) ELSE `low` END,
-//				`volume` = VALUES(`volume`),
-//				`close`  = VALUES(`close`)
-//			");
-//		}
+		} else {
+			$now = time();
+			$timeid = date('YmdHis'); // 20170530152259 unique for date
+			$ctime = date('Y-m-d H:i:s');
+			if ($bf) {
+				/** Bitfinex websocked */
+				$last_price = $ticker[7];
+				$volume = $ticker[8];
+				$instrument = $bf_pair;
+
+				/** if timeid passed, we use it, otherwise use generated one.. */
+				$timeid = ($ticker['timeid'] ?? $timeid);
+			} else {
+				/** Oanda websocket */
+				$last_price = $ticker['tick']['bid'];
+				$instrument = $ticker['tick']['instrument'];
+				$volume = 0;
+			}
+			
+			/** tick table update */
+			$ins = \DB::insert("
+				INSERT INTO bowhead_ohlc_tick
+				(`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`, `ctime`)
+				VALUES
+				('$instrument', $timeid, $last_price, $last_price, $last_price, $last_price, $volume, '$ctime')
+				ON DUPLICATE KEY UPDATE
+				`high`   = CASE WHEN `high` < VALUES(`high`) THEN VALUES(`high`) ELSE `high` END,
+				`low`    = CASE WHEN `low` > VALUES(`low`) THEN VALUES(`low`) ELSE `low` END,
+				`volume` = VALUES(`volume`),
+				`close`  = VALUES(`close`)
+			");
+		}
 
 
         /** 1m table update **/
@@ -508,7 +509,7 @@ trait OHLC
             ->orderby('timeid', 'DESC')
             ->limit($limit)
             ->get();
-	echo  'getRecentData: '. date(' Y-m-d H:i:s ', $current_time)."\n";
+	echo  'getRecentData ('.$pair.'): '. date(' Y-m-d H:i:s ', $current_time)."\n";
 
 	$periods = [];
 	$ptime = null;
@@ -525,7 +526,8 @@ trait OHLC
  		  $periodcheck = $current_time - $ptime;
 		  if($periodcheck > $variance) {
 		      echo "Most recent data is too old... \$periodcheck > \$variance ($periodcheck > $variance) ... \$current_time=$current_time, \$ptime=$ptime, \$variance=$variance)";
-		      $die_on_large_period && die();
+//		      $die_on_large_period && die();
+			  return;
 		  }
 		  $periods[] = $periodcheck;
 	   } else {

@@ -12,7 +12,7 @@ To show heartbeat, replace [options] by -b or --displayHeartBeat
 
 import requests
 import json
-import dotenv
+#import dotenv
 import os
 
 from optparse import OptionParser
@@ -25,7 +25,7 @@ def connect_to_stream():
     fxTrade Practice (Demo)     The demo (simulated money) environment
     """
 
-    dotenv.load()
+ #   dotenv.load()
 
 
     domainDict = {
@@ -36,12 +36,13 @@ def connect_to_stream():
     # Replace the following variables with your personal values
     environment = "demo" # Replace this 'live' if you wish to connect to the live environment
     domain = domainDict[environment]
-    access_token = os.environ.get('OANDA_TOKEN')
-    account_id = os.environ.get('OANDA_ACCOUNT')
+    access_token = "fd34a3e27890401e471e4f98cb75ffad-0c392634e549444f1838a0d241d1e5dc"
+    account_id = "101-004-7388733-001"
     instruments = 'USD_JPY,EUR_USD,AUD_USD,EUR_GBP,USD_CAD,USD_CHF,USD_MXN,USD_TRY,USD_CNH,NZD_USD'
 
     try:
         s = requests.Session()
+
         url = "https://" + domain + "/v3/accounts/" + account_id + "/pricing/stream"
         headers = {'Authorization' : 'Bearer ' + access_token,
                    # 'X-Accept-Datetime-Format' : 'unix'
@@ -50,6 +51,7 @@ def connect_to_stream():
         req = requests.Request('GET', url, headers = headers, params = params)
         pre = req.prepare()
         resp = s.send(pre, stream = True, verify = True)
+	print(resp)
         return resp
     except Exception as e:
         s.close()
@@ -57,10 +59,12 @@ def connect_to_stream():
 
 def demo(displayHeartbeat):
     response = connect_to_stream()
+ 
     if response.status_code != 200:
         print(response.text)
         return
     for line in response.iter_lines(1):
+        print(line)
         if line:
             try:
                 line = line.decode('utf-8')

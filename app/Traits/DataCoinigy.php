@@ -36,12 +36,14 @@ trait DataCoinigy
                 $this->txtime = $stats->getTransferTime();
             }
         ]);
+
         if (!empty($data)){
             $response = $client->post($endpoint, ['form_params' => $data]);
         } else {
             $response = $client->post($endpoint);
         }
         $code = $response->getStatusCode();
+echo $response->getBody();
         if ($code == '200') {
             return json_decode($response->getBody(), 1);
         } else {

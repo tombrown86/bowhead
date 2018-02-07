@@ -175,7 +175,7 @@ class EvaluateStrategies2Command extends Command {
 
 							
 							$result = $this->getWinOrLoose($instrument, $min, $endmin, $long, $amt_takeprofit, $amt_stoploss);
-							print_r($result);
+							
 
 							// keep note of end time for this trade.
 							$strategy_open_position[$strategy_name] = $result['time'];
@@ -234,10 +234,10 @@ class EvaluateStrategies2Command extends Command {
 					}
 				}
 
-				$all_results[$take] = $results;
+//				$all_results[$take] = $results;
 			}
 		}
-		file_put_contents('/tmp/strats_allresults', print_r($all_results, 1));
+//		file_put_contents('/tmp/strats_allresults', print_r($all_results, 1));
 	}
 
 	/**

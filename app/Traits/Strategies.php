@@ -1075,4 +1075,58 @@ trait Strategies
     }
 
 
+	function check_for_special_combo($pair, $indicators, $candles) {
+		// find any candle first
+		$long_candle = $short_candle = FALSE;
+		if (isset($candles['current'])) {
+			foreach ($candles['current'] as $candle_value) {
+				if ($candle_value > 0) {
+					$long_candle = TRUE;
+				} else if ($candle_value < 0) {
+					$short_candle = TRUE;
+				}
+			}
+		}
+		if ($long_candle || $short_candle) {
+			$long_matches = $short_matches = [];
+			foreach ([
+			'both' => [['indicators' => ['macd', 'stoch']],
+				['indicators' => ['macd', 'stochf']],
+				['indicators' => ['macd', 'stochf']],
+				['indicators' => ['macd', 'willr']],
+				['indicators' => ['macd', 'cci']],
+				['indicators' => ['ao', 'atr']],
+				['indicators' => ['ao', 'er']],
+				['indicators' => ['macd', 'rsi']]],
+			'long' => [
+				['indicators' => ['macd', 'rsi']],
+				['indicators' => ['ao', 'adx']],
+				['indicators' => ['macd', 'adx']],
+				['indicators' => ['macd', 'bollingerBands']],
+				['indicators' => ['ao', 'hli']],
+				['indicators' => ['macd', 'er']]]
+			] as $longorshort => $technique_list) {
+
+				foreach ($technique_list as $technique) {
+					$all_signal_long = $longorshort == 'both' || $longorshort == 'long';
+					$all_signal_short = $longorshort == 'both' || $longorshort == 'short';
+					foreach ($technique['indicators'] as $indicator) {
+						$all_signal_long = $indicators[$indicator] > 0 && $all_signal_long;
+						$all_signal_short = $indicators[$indicator] < 0 && $all_signal_short;
+					}
+
+					if ($long_candle && $all_signal_long)
+						$long_matches[] = print_r($technique['indicators'], 1);
+					if ($short_candle && $all_signal_short)
+						$short_matches[] = print_r($technique['indicators'], 1);
+				}
+			}
+
+			if (count($long_matches))
+				return ['signal' => 'long', 'long_matches' => $long_matches];
+			if (count($short_matches))
+				return ['signal' => 'short', 'short_matches' => $short_matches];
+		}
+		return ['signal' => 'none'];
+	}
 }

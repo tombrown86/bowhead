@@ -78,7 +78,7 @@ class OandaStreamCommand extends Command
                   $ticker = [];
 				  
                   $ticker['tick']['bid'] = round(((float) $price->bids[0]->price + (float) $price->asks[0]->price) / 2, 5);
-                  $ticker['tick']['instrument'] = $price->instrument;
+                  $ticker['tick']['instrument'] = str_replace('-', '/', $price->instrument);
                   $this->markOHLC($ticker);
                   $ins = $ticker['tick']['instrument'];
                   $curr[$ins] = (($price->bids[0]->price + $price->asks[0]->price)/2);

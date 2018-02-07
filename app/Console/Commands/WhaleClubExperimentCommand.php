@@ -61,7 +61,7 @@ class WhaleClubExperimentCommand extends Command {
 	 *
 	 * @var string
 	 */
-	protected $description = 'Binary options strategy bot';
+	protected $description = '';
 	protected $order_cooloff;
 	protected $last_order_bounds = [];
 
@@ -101,23 +101,17 @@ class WhaleClubExperimentCommand extends Command {
 		echo "PRESS 'q' TO QUIT AND CLOSE ALL POSITIONS\n\n\n";
 		stream_set_blocking(STDIN, 0);
 
-		$instruments = ['BTC/USD', /*'ETH-USD'*/];
+		$instruments = ['EUR_USD'];
 		$util = new Util\BrokersUtil();
 		$wc = new Util\Whaleclub($this->instrument);
 		$console = new \Bowhead\Util\Console();
 		$indicators = new \Bowhead\Util\Indicators();
 
-        $cand        = new Util\Candles();
-        $ind         = new Util\Indicators();
+	        $cand = new Util\Candles();
+	        $ind = new Util\Indicators();
 
-		
 		$this->wc = $wc;
-//		register_shutdown_function(array($this, 'shutdown'));  //
 
-		
-		/**
-		 *  Enter a loop where we check the strategy every minute.
-		 */
 		while (1) {
 			if (ord(fgetc(STDIN)) == 113) { // try to catch keypress 'q'
 				echo "QUIT detected...";
@@ -127,51 +121,44 @@ class WhaleClubExperimentCommand extends Command {
 
 			foreach ($instruments as $instrument) {
 				$data = $this->getRecentData($instrument, 200);
-				
+
 				$candles = $cand->allCandles($instrument, $data);
 				$indicators = $ind->allSignals($instrument, $data);
-				$signals = $this->signals(1, 0, [$instrument]);
-				
-				unset($indicators['ma']); // not needed here.	
-				
+				$signals = $this->signals(1, 0, [$instrument], $data);
+
+				$result = $this->check_for_special_combo($instrument, $indicators, $candles);
+
 				$direction = 0;
-				if(isset($candles['current']) && count($candles['current'])) {
-					foreach($candles['current'] as $candle_name=>$candle_value) {
-						if($candle_value > 1) {
-							if($indicators['adx'] > 1 && $signals['BTC/USD']['er'] > 1) {
-								$direction = 1;
-							}
-							break;
-						} else if($candle_value < 1) {
-							if($indicators['adx'] < 1 && $signals['BTC/USD']['er'] < 1) {
-								$direction = -1;
-							}
-							break;
-						}
-					}
+				if($result['signal'] == 'long') {
+					$direction = 1;
+					echo "\n-$instrument: Found long signal... ".print_r($result, 1);
+				} else {
+					$direction = -1; 
+                                        echo "\n-$instrument: Found short signal... ".print_r($result, 1);
 				}
-				
-				echo "\n-$instrument: \$indicators['adx']: $indicators[adx],  \$signals['BTC/USD']['er']: ".$signals['BTC/USD']['er'].",  \$candles['current']: ".print_r(@$candles['current'], 1)." .... \$direction=$direction ... ";
-				
+
 				if($direction != 0) {
-					$price = $wc->getPrice(str_replace('/', '-', $instrument));
+					$price = $wc->getPrice(str_replace(['/', '_'], '-', $instrument));
 					$current_price = $price['price'];
-					
+
 					if (isset($this->last_order_bounds[$instrument]) && $current_price > $this->last_order_bounds[$instrument][0] && $current_price < $this->last_order_bounds[$instrument][1]) {
 						echo ", strong signal but current price $current_price within bounds of last order (" . $this->last_order_bounds[$instrument][0] . " - " . $this->last_order_bounds[$instrument][1] . ")..\n";
 					} else {
 						echo ", Strong signal! .. current price found: $current_price..\n\n";
 						$this->last_order_bounds[$instrument] = null;
+						$fibs = $this->calcFibonacci($data);
 						if (is_numeric($current_price) && $current_price > 0) {
-							echo "$instrument: Going short..\n";
 							if ($direction < 0) {
+								echo "$instrument: Going short..\n";
+
 								$console->buzzer();
-								$stop_loss = $current_price + 150;
-								$take_profit = $current_price - 150;
+                                                                $take_profit = $fibs['S2'];
+                                                                $stop_loss = $fibs['R2'];
+								
 								$order = [
 									'direction' => 'short'
-									, 'market' => str_replace('/', '-', $instrument)
-									, 'leverage' => 5
+									, 'market' => str_replace(['/', '_'], '-', $instrument)
+									, 'leverage' => 222
 									, 'stop_loss' => $stop_loss
 									, 'take_profit' => $take_profit
 									, 'size' => 0.2
@@ -187,13 +174,17 @@ class WhaleClubExperimentCommand extends Command {
 							}
 
 							if ($direction > 0) {
+								echo "$instrument: Going long..\n";
+                                                                $take_profit = $fibs['R2'];
+                                                                $stop_loss = $fibs['S2'];
+
 								$console->buzzer();
 								$stop_loss =  $current_price - 150;
 								$take_profit =  $current_price + 150;
 								$order = [
 									'direction' => 'long'
-									, 'market' => str_replace('/', '-', $instrument)
-									, 'leverage' => 5
+									, 'market' => str_replace(['/', '_'], '-', $instrument)
+									, 'leverage' => 222
 									, 'stop_loss' => $stop_loss
 									, 'take_profit' => $take_profit
 									, 'size' => 0.2

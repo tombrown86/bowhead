@@ -94,7 +94,7 @@ $bad=0;
 //					, 'weighted_price' => $d[7]
 				];
 //				print_r($row);die;
-				$this->markOHLC($row, 'backfill');
+				$this->markOHLC($row, 'raw');
 			}
 		}
 		

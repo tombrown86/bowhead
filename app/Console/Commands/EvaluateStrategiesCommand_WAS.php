@@ -126,38 +126,14 @@ class EvaluateStrategiesCommand extends Command {
 			
 			$win_or_lose_long = NULL;
 			$win_or_lose_short  = NULL;
-
-			$count_stats = [];
-
-                        foreach(['indicators'=>$indicators, 'trends'=>$trends['EUR/USD'], 'candles'=>isset($candles['current']) ? $candles['current'] : []] as $typename=>$res) {
-				$cl = $cs = 0;
-				foreach($res as $n=>$v) {
-	                                if($v > 0) {
-                                	        $cl ++;
-                        	        }
-                	                if($v < 0) {
-        	                                $cs ++;
-	                                }
-				}
-				foreach(['long', 'short'] as $los) {
-					for($i = 1; $i <= 12; $i++) {
-			                        if($cl >= $i) {
-		        	                        $count_strats['count_'.$los.'_'.$i.'_'.$typename] = $los == 'long' ? 1 : -1;
-		                	        }
-					}
-				}
-			}
-
-
-//			foreach ($indicators as $indicator_name => $indicator_value) {
-//				foreach ($signals['EUR/USD'] as $signal_name => $signal_value) {
-//					if (isset($candles['current'])) {
-//						foreach ($candles['current'] as $candle_name => $candle_value) {
-						foreach($count_strats as $strategy_name => $value) {
-//							if (isset($signal_name) && isset($indicator_name) && $signal_name == $indicator_name) {
-//								continue;
-//							}
-//							$strategy_name = "$indicator_name" . "_$signal_name"; //. "_$candle_name";
+			foreach ($indicators as $indicator_name => $indicator_value) {
+				foreach ($signals['EUR/USD'] as $signal_name => $signal_value) {
+					if (isset($candles['current'])) {
+						foreach ($candles['current'] as $candle_name => $candle_value) {
+							if (isset($signal_name) && isset($indicator_name) && $signal_name == $indicator_name) {
+								continue;
+							}
+							$strategy_name = "$indicator_name" . "_$signal_name"; //. "_$candle_name";
 //								$strategy_name = "$trend_name";
 
 							if (in_array($strategy_name, $strategy_open_position)) {
@@ -166,11 +142,11 @@ class EvaluateStrategiesCommand extends Command {
 
 
 							$overbought = $underbought = 0;
-							if($value > 0) {$overbought=1;}
-							if($value < 0) {$underbought=1;}
+							//	if($trend_value > 0) {$overbought=1;}
+							//	if($trend_value < 0) {$underbought=1;}
 
 
-/*							if ($candle_value > 0 &&
+							if ($candle_value > 0 &&
 									$signal_value > 0 && $indicator_value > 0) {
 								//								echo $console->colorize("CREATING A LONG ORDER: $strategy_name\n", 'green');
 								$underbought = 1;
@@ -180,7 +156,7 @@ class EvaluateStrategiesCommand extends Command {
 								//								echo $console->colorize("CREATING A SHORT ORDER: $strategy_name\n", 'red');
 								$overbought = 1;
 							}
-*/
+
 
 							if ($overbought || $underbought) {
 								if ($overbought) {
@@ -219,7 +195,7 @@ class EvaluateStrategiesCommand extends Command {
 									}
 									$result = $win_or_lose_short;
 								}
-
+								
 								// keep note of end time for this trade.
 								$strategy_open_position[$strategy_name] = $result['time'];
 
@@ -300,12 +276,12 @@ class EvaluateStrategiesCommand extends Command {
 //								}
 //							}
 							}
-//						}
-//					}
+						}
+					}
 //				}}
-//				}
-//			}
+				}
 			}
+
 			if (!($min % 86400) || $min == $end_min) {
 				$percs = [];
 				foreach ($results as $strategy_name => $data) {
@@ -323,7 +299,7 @@ class EvaluateStrategiesCommand extends Command {
 				array_multisort($percs, $results);
 
 				print_r($results);
-				file_put_contents('/home/terry/results/eurusd_fib_r2s2__count_multiple_indicators_or_candles_or_trends', json_encode($results) . "\n\n\nprinted:" . print_r($results, 1) . ' ' . print_r('min so far ' . date('Y-m-d H:i:s', $min), 1) . "\n\n $instrument: Skipped $skipped due to incomplete data");
+				file_put_contents('/home/terry/results/eurusd_fib_r2s2_any_candle', json_encode($results) . "\n\n\nprinted:" . print_r($results, 1) . ' ' . print_r('min so far ' . date('Y-m-d H:i:s', $min), 1) . "\n\n $instrument: Skipped $skipped due to incomplete data");
 
 				echo "\n\n $instrument: Skipped $skipped due to incomplete data";
 			}
