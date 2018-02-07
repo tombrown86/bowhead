@@ -132,7 +132,7 @@ class WhaleClubExperimentCommand extends Command {
 				if($result['signal'] == 'long') {
 					$direction = 1;
 					echo "\n-$instrument: Found long signal... ".print_r($result, 1);
-				} else {
+				} elseif($result['signal'] == 'short') {
 					$direction = -1; 
                                         echo "\n-$instrument: Found short signal... ".print_r($result, 1);
 				}
@@ -147,13 +147,14 @@ class WhaleClubExperimentCommand extends Command {
 						echo ", Strong signal! .. current price found: $current_price..\n\n";
 						$this->last_order_bounds[$instrument] = null;
 						$fibs = $this->calcFibonacci($data);
+print_r($current_price);print_r($fibs);
 						if (is_numeric($current_price) && $current_price > 0) {
 							if ($direction < 0) {
 								echo "$instrument: Going short..\n";
 
 								$console->buzzer();
-                                                                $take_profit = $fibs['S2'];
-                                                                $stop_loss = $fibs['R2'];
+                                                                $take_profit = $fibs['S3'];
+                                                                $stop_loss = $fibs['R3'];
 								
 								$order = [
 									'direction' => 'short'
@@ -161,7 +162,7 @@ class WhaleClubExperimentCommand extends Command {
 									, 'leverage' => 222
 									, 'stop_loss' => $stop_loss
 									, 'take_profit' => $take_profit
-									, 'size' => 0.2
+									, 'size' => 2.22
 								#	, 'entry_price' => $current_price
 								];
 								print_r($order);
@@ -175,8 +176,8 @@ class WhaleClubExperimentCommand extends Command {
 
 							if ($direction > 0) {
 								echo "$instrument: Going long..\n";
-                                                                $take_profit = $fibs['R2'];
-                                                                $stop_loss = $fibs['S2'];
+                                                                $take_profit = $fibs['R3'];
+                                                                $stop_loss = $fibs['S3'];
 
 								$console->buzzer();
 								$stop_loss =  $current_price - 150;
@@ -187,7 +188,7 @@ class WhaleClubExperimentCommand extends Command {
 									, 'leverage' => 222
 									, 'stop_loss' => $stop_loss
 									, 'take_profit' => $take_profit
-									, 'size' => 0.2
+									, 'size' => 2.22
 																		#        , 'entry_price' => $current_price
 
 								];
