@@ -194,6 +194,7 @@ class EvaluateStrategiesCommand extends Command {
 													'total_shorts' => 0,
 													'total_wins' => 0,
 													'total_loses' => 0,
+													'avg_stop_take_range' => [],
 														/* these will be created as necessary
 														  'long_correct_candle' => [],
 														  'long_correct_inverse_candle' => [],
@@ -240,15 +241,13 @@ class EvaluateStrategiesCommand extends Command {
 												$results[$bounds_strategy_name]['timeout_loses'] ++;
 											}
 											$results[$bounds_strategy_name]['wins_plus_loses'] += $result['win'] ? 1 : -1;
+
+											$results[$bounds_strategy_name]['avg_stop_take_range'][] = abs($take - $stop);
 										}
 									}
-
-	//								}
-	//							}
 								}
 							}
 						}
-	//				}}
 					}
 				}
 			}
@@ -312,6 +311,13 @@ class EvaluateStrategiesCommand extends Command {
 					if ($results[$strategy_name]['positions_count']) {
 						unset($results[$strategy_name]['% PERCENTAGE WIN']);
 						$perc = $results[$strategy_name]['% PERCENTAGE WIN'] = ((($results[$strategy_name]['total_wins']) / $results[$strategy_name]['positions_count']) * 100);
+					}
+
+					// get avg bound range
+					if(count($results[$strategy_name]['avg_stop_take_range'])) {
+						$results[$strategy_name]['avg_stop_take_range'] = array_sum($results[$strategy_name]['avg_stop_take_range']) / count($results[$strategy_name]['avg_stop_take_range']);
+					} else {
+						$results[$strategy_name]['avg_stop_take_range'] = 'null';
 					}
 
 
