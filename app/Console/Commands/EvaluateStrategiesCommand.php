@@ -81,238 +81,210 @@ class EvaluateStrategiesCommand extends Command {
 					unset($strategy_open_position[$strategy]);
 				}
 			}
+			foreach(['1m', '5m', '15m', /*'30m', '1h'*/] as $interval) {
+				$data = $this->getRecentData($instrument, 200, false, date('H'), $interval, false, $min, false);
+				if (count($data['periods']) < 200) {
+					$skipped ++;
+					echo "\n !!!!!!!!!!!!!!! Less than 200 periods returned ($min)! \n";
+					continue;
+				}
+				if (max($data['periods']) > 500) {
+					$skipped ++;
+					echo "\n !!!!!!!!!!!!!!! Skipping, max period was " . max($data['periods']) . "! \n";
+					continue;
+				}
+				$current_price = ($data['high'][count($data['low']) - 1] + $data['low'][count($data['low']) - 1]) / 2;
 
-			$underbought = $overbought = 0;
-
-			$data = $this->getRecentData($instrument, 200, false, date('H'), $interval, false, $min, false);
-			if (count($data['periods']) < 200) {
-				$skipped ++;
-				echo "\n !!!!!!!!!!!!!!! Less than 200 periods returned ($min)! \n";
-				continue;
-			}
-			if (max($data['periods']) > 500) {
-				$skipped ++;
-				echo "\n !!!!!!!!!!!!!!! Skipping, max period was " . max($data['periods']) . "! \n";
-				continue;
-			}
-			$current_price = ($data['high'][count($data['low']) - 1] + $data['low'][count($data['low']) - 1]) / 2;
-
-			$list_indicators = array('adx', 'aroonosc', 'cmo', 'sar', 'cci', 'mfi', 'obv', 'stoch', 'rsi', 'macd', 'bollingerBands', 'atr', 'er', 'hli', 'ultosc', 'willr', 'roc', 'stochrsi');
-			$list_signals = ['rsi', 'stoch', 'stochrsi', 'macd', 'adx', 'willr', 'cci', 'atr', 'hli', 'ultosc', 'roc', 'er'];
+				$list_indicators = array('adx', 'aroonosc', 'cmo', 'sar', 'cci', 'mfi', 'obv', 'stoch', 'rsi', 'macd', 'bollingerBands', 'atr', 'er', 'hli', 'ultosc', 'willr', 'roc', 'stochrsi');
+				$list_signals = ['rsi', 'stoch', 'stochrsi', 'macd', 'adx', 'willr', 'cci', 'atr', 'hli', 'ultosc', 'roc', 'er'];
 
 
-			$instruments = ['EUR/USD'];
+				$instruments = ['EUR/USD'];
 
-			// candles
-			$candles = $cand->allCandles('EUR/USD', $data);
+				// candles
+				$candles = $cand->allCandles('EUR/USD', $data);
 
-			// signals
-			$signals = $this->signals(1, 0, ['EUR/USD'], $data);
+				// signals
+				$signals = $this->signals(1, 0, ['EUR/USD'], $data);
 
-			// trends
+				// trends
 
-			foreach ($instruments as $instrument) {
-				$trends[$instrument]['httc'] = $ind->httc($instrument, $data);   # Hilbert Transform - Trend vs Cycle Mode
-				$trends[$instrument]['htl'] = $ind->htl($instrument, $data); # Hilbert Transform - Instantaneous Trendline
-				$trends[$instrument]['hts'] = $ind->hts($instrument, $data, true); # Hilbert Transform - Sinewave
-				$trends[$instrument]['mmi'] = $ind->mmi($instrument, $data); # market meanness
-			}
+				foreach ($instruments as $instrument) {
+					$trends[$instrument]['httc'] = $ind->httc($instrument, $data);   # Hilbert Transform - Trend vs Cycle Mode
+					$trends[$instrument]['htl'] = $ind->htl($instrument, $data); # Hilbert Transform - Instantaneous Trendline
+					$trends[$instrument]['hts'] = $ind->hts($instrument, $data, true); # Hilbert Transform - Sinewave
+					$trends[$instrument]['mmi'] = $ind->mmi($instrument, $data); # market meanness
+				}
 
-			// our indicators
-			$indicators = $ind->allSignals('EUR/USD', $data);
-			unset($indicators['ma']); // not needed here.
+				// our indicators
+				$indicators = $ind->allSignals('EUR/USD', $data);
+				unset($indicators['ma']); // not needed here.
+
+
 //				foreach($trends[$instrument] as $trend_name=>$trend_value) { if($trend_value != 0) {
 
+				$win_or_lose_long = NULL;
+				$win_or_lose_short = NULL;
+				foreach ($indicators as $indicator_name => $indicator_value) {
+					foreach ($signals['EUR/USD'] as $signal_name => $signal_value) {
+						if (isset($candles['current'])) {
+							foreach ($candles['current'] as $candle_name => $candle_value) {
+								if (isset($signal_name) && isset($indicator_name) && $signal_name == $indicator_name) {
+									continue;
+								}
+								$strategy_name = $interval . '_' . $indicator_name . "_$signal_name"; //. "_$candle_name";
+	//								$strategy_name = "$trend_name";
 
-			$win_or_lose_long = NULL;
-			$win_or_lose_short = NULL;
-			foreach ($indicators as $indicator_name => $indicator_value) {
-				foreach ($signals['EUR/USD'] as $signal_name => $signal_value) {
-					if (isset($candles['current'])) {
-						foreach ($candles['current'] as $candle_name => $candle_value) {
-							if (isset($signal_name) && isset($indicator_name) && $signal_name == $indicator_name) {
-								continue;
-							}
-							$strategy_name = "$indicator_name" . "_$signal_name"; //. "_$candle_name";
-//								$strategy_name = "$trend_name";
+								if (in_array($strategy_name, $strategy_open_position)) {
+									continue;
+								}
 
-							if (in_array($strategy_name, $strategy_open_position)) {
-								continue;
-							}
+								$overbought = $underbought = 0;
+								//	if($trend_value > 0) {$overbought=1;}
+								//	if($trend_value < 0) {$underbought=1;}
 
-
-							$overbought = $underbought = 0;
-							//	if($trend_value > 0) {$overbought=1;}
-							//	if($trend_value < 0) {$underbought=1;}
-
-
-							if ($candle_value > 0 &&
+								if ($candle_value > 0 &&
 									$signal_value > 0 && $indicator_value > 0) {
-								//								echo $console->colorize("CREATING A LONG ORDER: $strategy_name\n", 'green');
-								$underbought = 1;
-							}
-							if ($candle_value < 0 &&
+									$underbought = 1;
+								}
+								if ($candle_value < 0 &&
 									$signal_value < 0 && $indicator_value < 0) {
-								//								echo $console->colorize("CREATING A SHORT ORDER: $strategy_name\n", 'red');
-								$overbought = 1;
-							}
-
-
-							if ($overbought || $underbought) {
-								if ($overbought) {
-									$long = false;
-								} else if ($underbought) {
-									$long = true;
-								}
-								$endmin = $min + (2 * 60 * 60);
-
-								$fibs = $this->calcFibonacci($data); // defaults to 'EUR/USD';
-								if ($long) {
-//									$take = $fibs['R3'];
-//									$stop = $fibs['S3'];
-									$perc = 20;
-									$lev = 222;
-									$take = $current_price + round(($current_price * ($perc / 222)) / 100, 5);
-									$perc = 10;
-									$stop = $current_price - round(($current_price * ($perc / 222)) / 100, 5);
-								} else {
-//									$take = $fibs['S3'];
-//									$stop = $fibs['R3'];
-									$perc = 20;
-									$lev = 222;
-									$take = $current_price - round(($current_price * ($perc / 222)) / 100, 5);
-									$perc = 10;
-									$stop = $current_price + round(($current_price * ($perc / 222)) / 100, 5);
+									$overbought = 1;
 								}
 
-								if ($long) {
-									if (!$win_or_lose_long) {
-										$win_or_lose_long = $this->getWinOrLoose('EUR/USD', $min, $endmin, TRUE, $take, $stop);
-									}
-									$result = $win_or_lose_long;
-								} else {
-									if (!$win_or_lose_short) {
-										$win_or_lose_short = $this->getWinOrLoose('EUR/USD', $min, $endmin, FALSE, $take, $stop);
-									}
-									$result = $win_or_lose_short;
-								}
 
-								// keep note of end time for this trade.
-								$strategy_open_position[$strategy_name] = $result['time'];
+								foreach(['demark', 'fib_r2s2', 'fib_r3s3', 'perc_20_20', 'perc_10_20'] as $bounds_method) {
+									$bounds_strategy_name = "$bounds_method $strategy_name";
+									if ($overbought || $underbought) {
+										if ($overbought) {
+											$long = false;
+										} else if ($underbought) {
+											$long = true;
+										}
+										$endmin = $min + (2 * 60 * 60);
+										$leverage = '20';
+										list($stop, $take) = $this->get_bounds($bounds_method, $data, $long, $current_price, $leverage);
 
-								if (!isset($results[$strategy_name])) {
-									$results[$strategy_name] = [
-										'long_wins' => 0,
-										'short_wins' => 0,
-										'long_loses' => 0,
-										'short_loses' => 0,
-										'timeout_loses' => 0,
-										'wins_plus_loses' => 0,
-										'positions_count' => 0,
-										'total_longs' => 0,
-										'total_shorts' => 0,
-										'total_wins' => 0,
-										'total_loses' => 0,
-/*these will be created as necessary
-										'long_correct_candle' => [],
-										'long_correct_inverse_candle' => [],
-										'long_wrong_candle' => [],
-										'long_wrong_inverse_candle' => [],
-										'short_correct_candle' => [],
-										'short_correct_inverse_candle' => [],
-										'short_wrong_candle' => [],
-										'short_wrong_inverse_candle' => [],
-
-										'long_correct_trend' => [],
-										'long_correct_inverse_trend' => [],
-										'long_wrong_trend' => [],
-										'long_wrong_inverse_trend' => [],
-										'short_correct_trend' => [],
-										'short_correct_inverse_trend' => [],
-										'short_wrong_trend' => [],
-										'short_wrong_inverse_trend' => [],
-										
-										'% WIN' => 0,*/
-									];
-								}
-
-								$prefix = $long ? 'long_' : 'short_';
-								$correct = $result['win'] ? 'correct_' : 'wrong_';
-								
-								if (isset($candles['current'])) {
-									foreach ($candles['current'] as $candle_name => $value) {
-										$inverse = (($value > 0 && $long) || ($value < 0 && !$long)) ? '' : 'inverse_';
-										if (!isset($results[$strategy_name][$prefix . $correct . 'candle'][$candle_name])) {
-											$results[$strategy_name][$prefix. $correct  . 'candle'][$candle_name] = 1;
+										if ($long) {
+											if (!$win_or_lose_long) {
+												$win_or_lose_long = $this->getWinOrLoose('EUR/USD', $min, $endmin, TRUE, $take, $stop);
+											}
+											$result = $win_or_lose_long;
 										} else {
-											$results[$strategy_name][$prefix . $correct . 'candle'][$candle_name];
+											if (!$win_or_lose_short) {
+												$win_or_lose_short = $this->getWinOrLoose('EUR/USD', $min, $endmin, FALSE, $take, $stop);
+											}
+											$result = $win_or_lose_short;
+										}
+
+										// keep note of end time for this trade.
+										$strategy_open_position[$bounds_strategy_name] = $result['time'];
+	
+										foreach([$bounds_strategy_name, 'all'] as $bounds_strategy_name) {
+											if (!isset($results[$bounds_strategy_name])) {
+												$results[$bounds_strategy_name] = [
+													'long_wins' => 0,
+													'short_wins' => 0,
+													'long_loses' => 0,
+													'short_loses' => 0,
+													'timeout_loses' => 0,
+													'wins_plus_loses' => 0,
+													'positions_count' => 0,
+													'total_longs' => 0,
+													'total_shorts' => 0,
+													'total_wins' => 0,
+													'total_loses' => 0,
+														/* these will be created as necessary
+														  'long_correct_candle' => [],
+														  'long_correct_inverse_candle' => [],
+														  'long_wrong_candle' => [],
+														  'long_wrong_inverse_candle' => [],
+														  'short_correct_candle' => [],
+														  'short_correct_inverse_candle' => [],
+														  'short_wrong_candle' => [],
+														  'short_wrong_inverse_candle' => [],
+	
+														  'long_correct_trend' => [],
+														  'long_correct_inverse_trend' => [],
+														  'long_wrong_trend' => [],
+														  'long_wrong_inverse_trend' => [],
+														  'short_correct_trend' => [],
+														  'short_correct_inverse_trend' => [],
+														  'short_wrong_trend' => [],
+														  'short_wrong_inverse_trend' => [],
+	
+														  '% WIN' => 0, */
+												];
+											}
+
+											$prefix = $long ? 'long_' : 'short_';
+											$correct = $result['win'] ? 'correct_' : 'wrong_';
+
+											foreach (['trend' => $trends[$instrument], 'candle' => isset($candles['current']) ? $candles['current'] : []] as $cot => $cots) {
+												foreach ($cots as $name => $value) {
+													$inverse = (($value > 0 && $long) || ($value < 0 && !$long)) ? '' : 'inverse_';
+													if (!isset($results[$bounds_strategy_name][$prefix . $correct . $cot][$name])) {
+														$results[$bounds_strategy_name][$prefix . $correct . $cot][$name] = 1;
+													} else {
+														$results[$bounds_strategy_name][$prefix . $correct . $cot][$name];
+													}
+												}
+											}
+
+											$results[$bounds_strategy_name]['positions_count'] ++;
+
+											$result['win'] ? $results[$bounds_strategy_name][($long ? 'long_' : 'short_') . 'wins'] ++ : $results[$bounds_strategy_name][($long ? 'long_' : 'short_') . 'loses'] ++;
+											$result['win'] ? $results[$bounds_strategy_name]['total_wins'] ++ : $results[$bounds_strategy_name]['total_loses'] ++;
+											$long ? $results[$bounds_strategy_name]['total_longs'] ++ : $results[$bounds_strategy_name]['total_shorts'] ++;
+											if ($result['time'] == $endmin) {
+												$results[$bounds_strategy_name]['timeout_loses'] ++;
+											}
+											$results[$bounds_strategy_name]['wins_plus_loses'] += $result['win'] ? 1 : -1;
 										}
 									}
-								}
-								foreach ($trends[$instrument] as $trend_name => $value) {
-									if ($value != 0) {
-										$inverse = (($value > 0 && $long) || ($value < 0 && !$long)) ? '' : 'inverse_';
-										if (!isset($results[$strategy_name][$prefix . $correct. 'trend'][$trend_name])) {
-											$results[$strategy_name][$prefix . $correct. 'trend'][$trend_name] = 1;
-										} else {
-											$results[$strategy_name][$prefix . $correct.'trend'][$trend_name];
-										}
-									}
-								}
 
-								$results[$strategy_name]['positions_count'] ++;
-
-								$result['win'] ? $results[$strategy_name][($long ? 'long_' : 'short_') . 'wins'] ++ : $results[$strategy_name][($long ? 'long_' : 'short_') . 'loses'] ++;
-								$result['win'] ? $results[$strategy_name]['total_wins'] ++ : $results[$strategy_name]['total_loses'] ++;
-								$long ? $results[$strategy_name]['total_longs'] ++ : $results[$strategy_name]['total_shorts'] ++;
-								if ($result['time'] == $endmin) {
-									$results[$strategy_name]['timeout_loses'] ++;
+	//								}
+	//							}
 								}
-								$results[$strategy_name]['wins_plus_loses'] += $result['win'] ? 1 : -1;
-
-//								}
-//							}
 							}
 						}
+	//				}}
 					}
-//				}}
 				}
 			}
-
+			
 			if (!($min % 86400) || $min == $end_min) {
 				$percs = [];
 				foreach ($results as $strategy_name => $data) {
 					// get candle + trend % successes and fails, including their use as anti signals
-					foreach(['long', 'short'] as $los) {
-//						foreach(['win' => 'correct', 'lose' => 'wrong'] as $wol=>$cow) {
-//							$total = (int)@$results[$strategy_name][$los.'_'.$wol.'s'];
-							foreach(['candle', 'inverse_candle', 'trend', 'inverse_trend'] as $cot) {
-								$key_correct = $los.'_correct_'.$cot;
-								$key_wrong = $los.'_wrong_'.$cot;
-								$key_perc = '% '.$los.'_'.$cot;
-								$all_names = [];
-								if(isset($data[$key_correct])) {
-									foreach($data[$key_correct] as $name=>$count) {
-										$all_names[] = $name;
-									}
-								}
-								if(isset($data[$key_wrong])) {
-									foreach($data[$key_wrong] as $name=>$count) {
-										$all_names[] = $name;
-									}
-								}
-								$all_names_with_outcome = [];
-								$to_sort_by = [];
-								foreach(array_unique($all_names) as $name) {
-									$percent = (((int)@$data[$key_correct][$name] / ((int)@$data[$key_correct][$name] + (int)@$data[$key_wrong][$name])) * 100);
-									$to_sort_by[] = $percent;
-									$results[$strategy_name][$key_perc][$name] = $percent;
-								}
-								if(count($to_sort_by)) {
-									array_multisort($to_sort_by, $results[$strategy_name][$key_perc]);
+					foreach (['candle', 'inverse_candle', 'trend', 'inverse_trend'] as $cot) {
+						foreach (['long', 'short'] as $los) {
+							$key_correct = $los . '_correct_' . $cot;
+							$key_wrong = $los . '_wrong_' . $cot;
+							$key_perc = 'PERCENTAGE  ' . $los . '_' . $cot;
+							$all_names = [];
+							if (isset($data[$key_correct])) {
+								foreach ($data[$key_correct] as $name => $count) {
+									$all_names[] = $name;
 								}
 							}
-//						}
+							if (isset($data[$key_wrong])) {
+								foreach ($data[$key_wrong] as $name => $count) {
+									$all_names[] = $name;
+								}
+							}
+							$all_names_with_outcome = [];
+							$to_sort_by = [];
+							foreach (array_unique($all_names) as $name) {
+								$percent = (((int) @$data[$key_correct][$name] / ((int) @$data[$key_correct][$name] + (int) @$data[$key_wrong][$name])) * 100);
+								$to_sort_by[] = $percent;
+								unset($results[$strategy_name][$key_perc][$name]);
+								$results[$strategy_name][$key_perc][$name] = $percent;
+							}
+							if (count($to_sort_by)) {
+								array_multisort($to_sort_by, $results[$strategy_name][$key_perc]);
+							}
+						}
 					}
 //					foreach (array_unique(array_merge(array_keys($data['short_wrong_candle']), array_keys($data['short_correct_candle']), array_keys($data['long_wrong_candle']), array_keys($data['long_correct_candle']))) as $candle_name) {
 //						$win = (int) @$data['long_correct_candle'][$candle_name] + (int) @$data['short_correct_candle'][$candle_name];
@@ -328,15 +300,18 @@ class EvaluateStrategiesCommand extends Command {
 //					}
 
 					if ($results[$strategy_name]['total_longs']) {
-						$results[$strategy_name]['% LONG win'] = ((($results[$strategy_name]['long_wins']) / $results[$strategy_name]['total_longs']) * 100);
+						unset($results[$strategy_name]['% PERCENTAGE LONG win']);
+						$results[$strategy_name]['% PERCENTAGE LONG win'] = ((($results[$strategy_name]['long_wins']) / $results[$strategy_name]['total_longs']) * 100);
 					}
 					if ($results[$strategy_name]['total_shorts']) {
-						$results[$strategy_name]['% SHORT win'] = ((($results[$strategy_name]['short_wins']) / $results[$strategy_name]['total_shorts']) * 100);
+						unset($results[$strategy_name]['% PERCENTAGE SHORT win']);
+						$results[$strategy_name]['% PERCENTAGE SHORT win'] = ((($results[$strategy_name]['short_wins']) / $results[$strategy_name]['total_shorts']) * 100);
 					}
 
 					$perc = 0;
 					if ($results[$strategy_name]['positions_count']) {
-						$perc = $results[$strategy_name]['% WIN'] = ((($results[$strategy_name]['total_wins']) / $results[$strategy_name]['positions_count']) * 100);
+						unset($results[$strategy_name]['% PERCENTAGE WIN']);
+						$perc = $results[$strategy_name]['% PERCENTAGE WIN'] = ((($results[$strategy_name]['total_wins']) / $results[$strategy_name]['positions_count']) * 100);
 					}
 
 
@@ -345,15 +320,11 @@ class EvaluateStrategiesCommand extends Command {
 				array_multisort($percs, $results);
 
 				print_r($results);
-				file_put_contents('/home/terry/results/eurusd_fib_perc20_10_any_candle', json_encode($results) . "\n\n\nprinted:" . print_r($results, 1) . ' ' . print_r('min so far ' . date('Y-m-d H:i:s', $min), 1) . "\n\n $instrument: Skipped $skipped due to incomplete data");
+				file_put_contents('/home/terry/results/eurusd_MULTIBOUND_any_candle_1and5mand15m_Intervals', "\n\n\nprinted:" . print_r($results, 1) . ' ' . print_r('min so far ' . date('Y-m-d H:i:s', $min), 1) . "\n\n $instrument: Skipped $skipped due to incomplete data");
 
 				echo "\n\n $instrument: Skipped $skipped due to incomplete data";
 			}
 		}
-
-//			$all_results[$take] = $results;
-//		}
-//		file_put_contents('/home/terry/results/nocandle_retestindstratandcandles_allresults', print_r($all_results, 1));
 	}
 
 }

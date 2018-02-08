@@ -1075,7 +1075,44 @@ trait Strategies
     }
 
 
-	function check_for_special_combo($pair, $indicators, $candles) {
+	private $special_combos = [
+		'1m' => [
+                        'both' => [['indicators' => ['macd', 'stoch']],
+                                ['indicators' => ['macd', 'stochf']],
+                                ['indicators' => ['macd', 'stochf']],
+                                ['indicators' => ['macd', 'willr']],
+                                ['indicators' => ['macd', 'cci']],
+                                ['indicators' => ['ao', 'atr']],
+                                ['indicators' => ['ao', 'er']],
+                                ['indicators' => ['macd', 'rsi']]],
+                        'long' => [
+                                ['indicators' => ['macd', 'rsi']],
+                                ['indicators' => ['ao', 'adx']],
+                                ['indicators' => ['macd', 'adx']],
+                                ['indicators' => ['macd', 'bollingerBands']],
+                                ['indicators' => ['ao', 'hli']],
+                                ['indicators' => ['macd', 'er']]]
+                        ]
+		, '5m' => [
+                        'both' => [['indicators' => ['macd', 'stoch']],
+                                ['indicators' => ['macd', 'stochf']],
+                                ['indicators' => ['macd', 'stochf']],
+                                ['indicators' => ['macd', 'willr']],
+                                ['indicators' => ['macd', 'cci']],
+                                ['indicators' => ['ao', 'atr']],
+                                ['indicators' => ['ao', 'er']],
+                                ['indicators' => ['macd', 'rsi']]],
+                        'long' => [
+                                ['indicators' => ['macd', 'rsi']],
+                                ['indicators' => ['ao', 'adx']],
+                                ['indicators' => ['macd', 'adx']],
+                                ['indicators' => ['macd', 'bollingerBands']],
+                                ['indicators' => ['ao', 'hli']],
+                                ['indicators' => ['macd', 'er']]]
+                        ]
+	];
+
+	function check_for_special_combo($pair, $indicators, $candles, $interval='1m') {
 		// find any candle first
 		$long_candle = $short_candle = FALSE;
 		if (isset($candles['current'])) {
@@ -1089,23 +1126,7 @@ trait Strategies
 		}
 		if ($long_candle || $short_candle) {
 			$long_matches = $short_matches = [];
-			foreach ([
-			'both' => [['indicators' => ['macd', 'stoch']],
-				['indicators' => ['macd', 'stochf']],
-				['indicators' => ['macd', 'stochf']],
-				['indicators' => ['macd', 'willr']],
-				['indicators' => ['macd', 'cci']],
-				['indicators' => ['ao', 'atr']],
-				['indicators' => ['ao', 'er']],
-				['indicators' => ['macd', 'rsi']]],
-			'long' => [
-				['indicators' => ['macd', 'rsi']],
-				['indicators' => ['ao', 'adx']],
-				['indicators' => ['macd', 'adx']],
-				['indicators' => ['macd', 'bollingerBands']],
-				['indicators' => ['ao', 'hli']],
-				['indicators' => ['macd', 'er']]]
-			] as $longorshort => $technique_list) {
+			foreach ($this->special_combos[$interval] as $longorshort => $technique_list) {
 
 				foreach ($technique_list as $technique) {
 					$all_signal_long = $longorshort == 'both' || $longorshort == 'long';
@@ -1129,4 +1150,29 @@ trait Strategies
 		}
 		return ['signal' => 'none'];
 	}
+
+
+	function get_bounds($method, $data, $long, $current_price, $leverage) {
+		switch ($method) {
+			case 'perc_10_20':
+				return $long ? [$current_price - round(($current_price * (10 / $leverage)) / 100, 5), $current_price + round(($current_price * (20 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (10 / $leverage)) / 100, 5), $current_price - round(($current_price * (20 / $leverage)) / 100, 5)];
+			case 'perc_20_20':
+				return $long ? [$current_price - round(($current_price * (20 / $leverage)) / 100, 5), $current_price + round(($current_price * (20 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (20 / $leverage)) / 100, 5), $current_price - round(($current_price * (20 / $leverage)) / 100, 5)];
+			case 'fib_r1s1':
+				$fibs = $this->calcFibonacci($data);
+				return $long ? [$fibs['S1'], $fibs['R1']] : [$fibs['R1'], $fibs['S1']];
+			case 'fib_r2s2':
+				$fibs = $this->calcFibonacci($data);
+				return $long ? [$fibs['S2'], $fibs['R2']] : [$fibs['R2'], $fibs['S2']];
+			case 'fib_r3s3':
+				$fibs = $this->calcFibonacci($data);
+				return $long ? [$fibs['S3'], $fibs['R3']] : [$fibs['R3'], $fibs['S3']];
+			case 'demark':
+				$demark = $this->calcDemark($data);
+				return $long ? [$demark['S1'], $demark['R1']] : [$demark['R1'], $demark['S1']];
+			default:
+				die('Invalid bounds method ' . $method);
+		}
+	}
+
 }

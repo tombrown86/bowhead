@@ -118,96 +118,93 @@ class WhaleClubExperimentCommand extends Command {
 				return null;
 			}
 			echo "\n";
+			foreach(['5m', '1m'] as $interval) {
+				foreach ($instruments as $instrument) {
+					$data = $this->getRecentData($instrument, 200,  $interval);
 
-			foreach ($instruments as $instrument) {
-				$data = $this->getRecentData($instrument, 200);
+					$candles = $cand->allCandles($instrument, $data);
+					$indicators = $ind->allSignals($instrument, $data);
+					$signals = $this->signals(1, 0, [$instrument], $data);
 
-				$candles = $cand->allCandles($instrument, $data);
-				$indicators = $ind->allSignals($instrument, $data);
-				$signals = $this->signals(1, 0, [$instrument], $data);
+					$result = $this->check_for_special_combo($instrument, $indicators, $candles, $interval);
 
-				$result = $this->check_for_special_combo($instrument, $indicators, $candles);
-
-				$direction = 0;
-				if($result['signal'] == 'long') {
 					$direction = 1;
-					echo "\n-$instrument: Found long signal... ".print_r($result, 1);
-				} elseif($result['signal'] == 'short') {
-					$direction = -1; 
-                                        echo "\n-$instrument: Found short signal... ".print_r($result, 1);
-				}
+					if($result['signal'] == 'long') {
+						$direction = 1;
+						echo "\n-$instrument ($interval): Found long signal... ".print_r($result, 1);
+					} elseif($result['signal'] == 'short') {
+						$direction = -1; 
+	                                        echo "\n-$instrument ($interval):: Found short signal... ".print_r($result, 1);
+					}
 
-				if($direction != 0) {
-					$price = $wc->getPrice(str_replace(['/', '_'], '-', $instrument));
-					$current_price = $price['price'];
+					if($direction != 0) {
+						$price = $wc->getPrice(str_replace(['/', '_'], '-', $instrument));
+						$current_price = $price['price'];
 
-					if (isset($this->last_order_bounds[$instrument]) && $current_price > $this->last_order_bounds[$instrument][0] && $current_price < $this->last_order_bounds[$instrument][1]) {
-						echo ", strong signal but current price $current_price within bounds of last order (" . $this->last_order_bounds[$instrument][0] . " - " . $this->last_order_bounds[$instrument][1] . ")..\n";
-					} else {
-						echo ", Strong signal! .. current price found: $current_price..\n\n";
-						$this->last_order_bounds[$instrument] = null;
-						$fibs = $this->calcFibonacci($data);
-print_r($current_price);print_r($fibs);
-						if (is_numeric($current_price) && $current_price > 0) {
-							if ($direction < 0) {
-								echo "$instrument: Going short..\n";
+						if (isset($this->last_order_bounds[$instrument]) && $current_price > $this->last_order_bounds[$instrument][0] && $current_price < $this->last_order_bounds[$instrument][1]) {
+							echo ", strong signal but current price $current_price within bounds of last order (" . $this->last_order_bounds[$instrument][0] . " - " . $this->last_order_bounds[$instrument][1] . ")..\n";
+						} else {
+							echo ", Strong signal! .. current price found: $current_price..\n\n";
+							$this->last_order_bounds[$instrument] = null;
 
-								$console->buzzer();
-                                                                $take_profit = $fibs['S3'];
-                                                                $stop_loss = $fibs['R3'];
-								
-								$order = [
-									'direction' => 'short'
-									, 'market' => str_replace(['/', '_'], '-', $instrument)
-									, 'leverage' => 222
-									, 'stop_loss' => $stop_loss
-									, 'take_profit' => $take_profit
-									, 'size' => 2.22
-								#	, 'entry_price' => $current_price
-								];
-								print_r($order);
-								$position = $wc->positionNew($order);
-								$console->colorize("\n$instrument: OPENED NEW SHORT POSIITION");
-								print_r($position);
-								if(isset($position['entered_at'])) {
-									$this->last_order_bounds[$instrument] = [$take_profit, $stop_loss];
+							if (is_numeric($current_price) && $current_price > 0) {
+								if ($direction < 0) {
+									echo "$instrument ($interval):: Going short..\n";
+
+									$console->buzzer();
+									$levereage = 222;
+									list($stop_loss, $take_profit) = $this->get_bounds($result['bounds_method'], $data, FALSE, $price, $levereage);
+
+									$order = [
+										'direction' => 'short'
+										, 'market' => str_replace(['/', '_'], '-', $instrument)
+										, 'leverage' => 222
+										, 'stop_loss' => $stop_loss
+										, 'take_profit' => $take_profit
+										, 'size' => 2.22
+									#	, 'entry_price' => $current_price
+									];
+									print_r($order);
+									$position = $wc->positionNew($order);
+									$console->colorize("\n$instrument ($interval):: OPENED NEW SHORT POSIITION");
+									print_r($position);
+									if(isset($position['entered_at'])) {
+										$this->last_order_bounds[$instrument] = [$take_profit, $stop_loss];
+									}
 								}
-							}
+								if ($direction > 0) {
+									echo "$instrument ($interval):: Going long..\n";
 
-							if ($direction > 0) {
-								echo "$instrument: Going long..\n";
-                                                                $take_profit = $fibs['R3'];
-                                                                $stop_loss = $fibs['S3'];
+                                                                        $levereage = 222;
+                                                                        list($stop_loss, $take_profit) = $this->get_bounds($result['bounds_method'], $data, TRUE, $price, $levereage);
 
-								$console->buzzer();
-								$stop_loss =  $current_price - 150;
-								$take_profit =  $current_price + 150;
-								$order = [
-									'direction' => 'long'
-									, 'market' => str_replace(['/', '_'], '-', $instrument)
-									, 'leverage' => 222
-									, 'stop_loss' => $stop_loss
-									, 'take_profit' => $take_profit
-									, 'size' => 2.22
-																		#        , 'entry_price' => $current_price
-
-								];
-								$position = $wc->positionNew($order);
-								$console->colorize("\n$instrument: OPENED NEW LONG POSIITION");
-								print_r($position);
-																		if(isset($position['entered_at'])) {
-																				$this->last_order_bounds[$instrument] = [$stop_loss, $take_profit];
-																		}
-							}
-							if(isset($position['entered_at'])) {
-								echo "$instrument: Created position..\n\n... no new positions until outside bounds: " . print_r($this->last_order_bounds, 1) . "\n\n\n";
-							} else {
-								echo "$instrument: Position not created...! \n";
+									$console->buzzer();
+									$order = [
+										'direction' => 'long'
+										, 'market' => str_replace(['/', '_'], '-', $instrument)
+										, 'leverage' => 222
+										, 'stop_loss' => $stop_loss
+										, 'take_profit' => $take_profit
+										, 'size' => 2.22
+																			#        , 'entry_price' => $current_price
+									];
+									print_r($order);
+									$position = $wc->positionNew($order);
+									$console->colorize("\n$instrument ($interval):: OPENED NEW LONG POSIITION");
+									print_r($position);
+																			if(isset($position['entered_at'])) {
+																					$this->last_order_bounds[$instrument] = [$stop_loss, $take_profit];
+																			}
+								}
+								if(isset($position['entered_at'])) {
+									echo "$instrument ($interval):: Created position..\n\n... no new positions until outside bounds: " . print_r($this->last_order_bounds, 1) . "\n\n\n";
+								} else {
+									echo "$instrument ($interval):: Position not created...! \n";
+								}
 							}
 						}
 					}
 				}
-				
 			}
 			sleep(8);
 		}
