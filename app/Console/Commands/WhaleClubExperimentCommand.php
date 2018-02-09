@@ -21,7 +21,11 @@ use AndreasGlaser\PPC\PPC; // https://github.com/andreas-glaser/poloniex-php-cli
 
 class WhaleClubExperimentCommand extends Command {
 
-    use Signals, Strategies, CandleMap, OHLC, Pivots; // add our traits
+	use Signals,
+	 Strategies,
+	 CandleMap,
+	 OHLC,
+	 Pivots; // add our traits
 
 	/**
 	 * The console command name.
@@ -107,8 +111,8 @@ class WhaleClubExperimentCommand extends Command {
 		$console = new \Bowhead\Util\Console();
 		$indicators = new \Bowhead\Util\Indicators();
 
-	        $cand = new Util\Candles();
-	        $ind = new Util\Indicators();
+		$cand = new Util\Candles();
+		$ind = new Util\Indicators();
 
 		$this->wc = $wc;
 
@@ -118,9 +122,9 @@ class WhaleClubExperimentCommand extends Command {
 				return null;
 			}
 			echo "\n";
-			foreach(['5m', '1m'] as $interval) {
+			foreach (['5m', '1m'] as $interval) {
 				foreach ($instruments as $instrument) {
-					$data = $this->getRecentData($instrument, 200,  $interval);
+					$data = $this->getRecentData($instrument, 200, $interval);
 
 					$candles = $cand->allCandles($instrument, $data);
 					$indicators = $ind->allSignals($instrument, $data);
@@ -128,16 +132,16 @@ class WhaleClubExperimentCommand extends Command {
 
 					$result = $this->check_for_special_combo($instrument, $indicators, $candles, $interval);
 
-					$direction = 1;
-					if($result['signal'] == 'long') {
+					$direction = 0;
+					if ($result['signal'] == 'long') {
 						$direction = 1;
-						echo "\n-$instrument ($interval): Found long signal... ".print_r($result, 1);
-					} elseif($result['signal'] == 'short') {
-						$direction = -1; 
-	                                        echo "\n-$instrument ($interval):: Found short signal... ".print_r($result, 1);
+						echo "\n-$instrument ($interval): Found long signal... " . print_r($result, 1);
+					} elseif ($result['signal'] == 'short') {
+						$direction = -1;
+						echo "\n-$instrument ($interval):: Found short signal... " . print_r($result, 1);
 					}
 
-					if($direction != 0) {
+					if ($direction != 0) {
 						$price = $wc->getPrice(str_replace(['/', '_'], '-', $instrument));
 						$current_price = $price['price'];
 
@@ -153,7 +157,7 @@ class WhaleClubExperimentCommand extends Command {
 
 									$console->buzzer();
 									$levereage = 222;
-									list($stop_loss, $take_profit) = $this->get_bounds($result['bounds_method'], $data, FALSE, $price, $levereage);
+									list($stop_loss, $take_profit) = $this->get_bounds(/*$result['bounds_method']*/'perc_20_20', $data, FALSE, $current_price, $levereage);
 
 									$order = [
 										'direction' => 'short'
@@ -161,22 +165,23 @@ class WhaleClubExperimentCommand extends Command {
 										, 'leverage' => 222
 										, 'stop_loss' => $stop_loss
 										, 'take_profit' => $take_profit
+										, 'stop_loss_trailing' => true
 										, 'size' => 2.22
-									#	, 'entry_price' => $current_price
+											#	, 'entry_price' => $current_price
 									];
 									print_r($order);
 									$position = $wc->positionNew($order);
 									$console->colorize("\n$instrument ($interval):: OPENED NEW SHORT POSIITION");
 									print_r($position);
-									if(isset($position['entered_at'])) {
+									if (isset($position['entered_at'])) {
 										$this->last_order_bounds[$instrument] = [$take_profit, $stop_loss];
 									}
 								}
 								if ($direction > 0) {
 									echo "$instrument ($interval):: Going long..\n";
 
-                                                                        $levereage = 222;
-                                                                        list($stop_loss, $take_profit) = $this->get_bounds($result['bounds_method'], $data, TRUE, $price, $levereage);
+									$levereage = 222;
+									list($stop_loss, $take_profit) = $this->get_bounds(/*$result['bounds_method']*/'perc_20_20', $data, TRUE, $current_price, $levereage);
 
 									$console->buzzer();
 									$order = [
@@ -185,18 +190,19 @@ class WhaleClubExperimentCommand extends Command {
 										, 'leverage' => 222
 										, 'stop_loss' => $stop_loss
 										, 'take_profit' => $take_profit
+										, 'stop_loss_trailing' => true
 										, 'size' => 2.22
-																			#        , 'entry_price' => $current_price
+											#        , 'entry_price' => $current_price
 									];
 									print_r($order);
 									$position = $wc->positionNew($order);
 									$console->colorize("\n$instrument ($interval):: OPENED NEW LONG POSIITION");
 									print_r($position);
-																			if(isset($position['entered_at'])) {
-																					$this->last_order_bounds[$instrument] = [$stop_loss, $take_profit];
-																			}
+									if (isset($position['entered_at'])) {
+										$this->last_order_bounds[$instrument] = [$stop_loss, $take_profit];
+									}
 								}
-								if(isset($position['entered_at'])) {
+								if (isset($position['entered_at'])) {
 									echo "$instrument ($interval):: Created position..\n\n... no new positions until outside bounds: " . print_r($this->last_order_bounds, 1) . "\n\n\n";
 								} else {
 									echo "$instrument ($interval):: Position not created...! \n";
