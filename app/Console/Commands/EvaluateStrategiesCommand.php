@@ -13,6 +13,7 @@ use Bowhead\Util;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use AndreasGlaser\PPC\PPC; // https://github.com/andreas-glaser/poloniex-php-client
+use Bowhead\Models;
 
 /**
  * Class ExampleCommand
@@ -23,10 +24,10 @@ ini_set('memory_limit', '1G');
 class EvaluateStrategiesCommand extends Command {
 
 	use Signals,
-		Strategies,
-		CandleMap,
-		OHLC,
-		Pivots; // add our traits
+	 Strategies,
+	 CandleMap,
+	 OHLC,
+	 Pivots; // add our traits
 
 	/**
 	 * The console command name.
@@ -76,19 +77,23 @@ class EvaluateStrategiesCommand extends Command {
 
 		$doubles = [];
 		$this->combinations($list_indicators, 2, $doubles);
-		$doubles = $this->unique_combinations($doubles);
 		$triplets = [];
 		$this->combinations($list_indicators, 3, $triplets);
-		$triplets = $this->unique_combinations($triplets);
-		$indicator_combinations = array_merge($doubles, $triplets);
+		$quadruples = [];
+		$this->combinations($list_indicators, 4, $quadruples);
+		$indicator_combinations = array_merge($doubles, $triplets, $quadruples);
 
 
 #		for ($take = 150; $take <= 150; $take+=25) {
 		$skipped = 0;
 		$take = 150;
 		$results = [];
-		$end_min = strtotime('2018-12-29 22:00:00');
-		for ($min = strtotime('2017-01-01 05:00:00'); $min <= $end_min; $min += 60) {
+		$end_min = strtotime('2018-01-01 05:00:00');
+		$start_min = strtotime('2017-01-01 05:00:00');
+		$spread = '0.01';
+		$leverage = 222;
+
+		for ($min = $start_min; $min <= $end_min; $min += 60) {
 			foreach ($strategy_open_position as $strategy => $etime) {
 				if ($etime < $min) {
 					unset($strategy_open_position[$strategy]);
@@ -130,7 +135,7 @@ class EvaluateStrategiesCommand extends Command {
 
 
 				foreach ($indicator_combinations as $indicators) {
-					$strategy_name = '';
+					$strategy_name = $interval;
 					foreach ($indicators as $indicator_name) {
 						$strategy_name .= '_' . $indicator_name;
 					}
@@ -159,7 +164,7 @@ class EvaluateStrategiesCommand extends Command {
 							}
 
 							if ($overbought XOR $underbought) {
-								foreach ([/* 'demark', 'fib_r2s2', 'fib_r3s3', */'perc_20_20', /* 'perc_10_20' */] as $bounds_method) {
+								foreach (['demark', 'fib_r2s2', 'fib_r3s3', 'perc_20_20', 'perc_30_40', 'perc_40_40'/* 'perc_10_20' */] as $bounds_method) {
 									$bounds_strategy_name = "$bounds_method $strategy_name";
 									if ($overbought) {
 										$long = FALSE;
@@ -168,7 +173,6 @@ class EvaluateStrategiesCommand extends Command {
 									}
 
 									$endmin = $min + (2 * 60 * 60);
-									$leverage = 222;
 									list($stop, $take) = $this->get_bounds($bounds_method, $data, $long, $current_price, $leverage);
 
 									if ($long) {
@@ -189,6 +193,9 @@ class EvaluateStrategiesCommand extends Command {
 									foreach ([$bounds_strategy_name, 'all'] as $bounds_strategy_name) {
 										if (!isset($results[$bounds_strategy_name])) {
 											$results[$bounds_strategy_name] = [
+												'strategy_name' => 'IC+1cand__' . implode('_', $indicators),
+												'bounds_strategy_name' => $bounds_method,
+												'indicator_count' => count($indicators),
 												'long_wins' => 0,
 												'short_wins' => 0,
 												'long_loses' => 0,
@@ -200,27 +207,30 @@ class EvaluateStrategiesCommand extends Command {
 												'total_shorts' => 0,
 												'total_wins' => 0,
 												'total_loses' => 0,
-												'avg_stop_take_range' => [],
-												/* these will be created as necessary
-												  'long_correct_candle' => [],
-												  'long_correct_inverse_candle' => [],
-												  'long_wrong_candle' => [],
-												  'long_wrong_inverse_candle' => [],
-												  'short_correct_candle' => [],
-												  'short_correct_inverse_candle' => [],
-												  'short_wrong_candle' => [],
-												  'short_wrong_inverse_candle' => [],
+												'avg_stop_take_range' => 0,
+												'avg_long_profit' => 0,
+												'avg_short_profit' => 0,
+												'avg_profit' => 0,
+													/* these will be created as necessary
+													  'long_correct_candle' => [],
+													  'long_correct_inverse_candle' => [],
+													  'long_wrong_candle' => [],
+													  'long_wrong_inverse_candle' => [],
+													  'short_correct_candle' => [],
+													  'short_correct_inverse_candle' => [],
+													  'short_wrong_candle' => [],
+													  'short_wrong_inverse_candle' => [],
 
-												  'long_correct_trend' => [],
-												  'long_correct_inverse_trend' => [],
-												  'long_wrong_trend' => [],
-												  'long_wrong_inverse_trend' => [],
-												  'short_correct_trend' => [],
-												  'short_correct_inverse_trend' => [],
-												  'short_wrong_trend' => [],
-												  'short_wrong_inverse_trend' => [],
+													  'long_correct_trend' => [],
+													  'long_correct_inverse_trend' => [],
+													  'long_wrong_trend' => [],
+													  'long_wrong_inverse_trend' => [],
+													  'short_correct_trend' => [],
+													  'short_correct_inverse_trend' => [],
+													  'short_wrong_trend' => [],
+													  'short_wrong_inverse_trend' => [],
 
-												  '% WIN' => 0, */
+													  '% WIN' => 0, */
 											];
 										}
 
@@ -248,7 +258,18 @@ class EvaluateStrategiesCommand extends Command {
 										}
 										$results[$bounds_strategy_name]['wins_plus_loses'] += $result['win'] ? 1 : -1;
 
-//										$results[$bounds_strategy_name]['avg_stop_take_range'][] = abs($take - $stop);
+
+										$results[$bounds_strategy_name]['avg_stop_take_range'] = (($results[$bounds_strategy_name]['avg_stop_take_range'] * ($results[$bounds_strategy_name]['positions_count'] - 1)) + abs($take - $stop)) / $results[$bounds_strategy_name]['positions_count'];
+
+
+										$profit_percentage = $leverage * ((($result['win'] ? abs($take - $current_price) : -abs($stop - $current_price)) / $current_price) - $spread);
+
+										if ($long) {
+											$results[$bounds_strategy_name]['avg_long_profit'] = (($results[$bounds_strategy_name]['avg_long_profit'] * ($results[$bounds_strategy_name]['total_longs'] - 1)) + $profit_percentage) / $results[$bounds_strategy_name]['total_longs'];
+										} else {
+											$results[$bounds_strategy_name]['avg_short_profit'] = (($results[$bounds_strategy_name]['avg_short_profit'] * ($results[$bounds_strategy_name]['total_shorts'] - 1)) + $profit_percentage) / $results[$bounds_strategy_name]['total_shorts'];
+										}
+										$results[$bounds_strategy_name]['avg_profit'] = (($results[$bounds_strategy_name]['avg_profit'] * ($results[$bounds_strategy_name]['positions_count'] - 1)) + $profit_percentage) / $results[$bounds_strategy_name]['positions_count'];
 									}
 								}
 							}
@@ -261,35 +282,35 @@ class EvaluateStrategiesCommand extends Command {
 				$percs = [];
 				foreach ($results as $strategy_name => $data) {
 //					// get candle + trend % successes and fails, including their use as anti signals
-//					foreach (['candle', 'inverse_candle', 'trend', 'inverse_trend'] as $cot) {
-//						foreach (['long', 'short'] as $los) {
-//							$key_correct = $los . '_correct_' . $cot;
-//							$key_wrong = $los . '_wrong_' . $cot;
-//							$key_perc = 'PERCENTAGE  ' . $los . '_' . $cot;
-//							$all_names = [];
-//							if (isset($data[$key_correct])) {
-//								foreach ($data[$key_correct] as $name => $count) {
-//									$all_names[] = $name;
-//								}
-//							}
-//							if (isset($data[$key_wrong])) {
-//								foreach ($data[$key_wrong] as $name => $count) {
-//									$all_names[] = $name;
-//								}
-//							}
-//							$all_names_with_outcome = [];
-//							$to_sort_by = [];
-//							foreach (array_unique($all_names) as $name) {
-//								$percent = (((int) @$data[$key_correct][$name] / ((int) @$data[$key_correct][$name] + (int) @$data[$key_wrong][$name])) * 100);
-//								$to_sort_by[] = $percent;
-//								unset($results[$strategy_name][$key_perc][$name]);
-//								$results[$strategy_name][$key_perc][$name] = $percent;
-//							}
-//							if (count($to_sort_by)) {
-//								array_multisort($to_sort_by, $results[$strategy_name][$key_perc]);
-//							}
-//						}
-//					}
+					foreach (['candle', 'inverse_candle', 'trend', 'inverse_trend'] as $cot) {
+						foreach (['long', 'short'] as $los) {
+							$key_correct = $los . '_correct_' . $cot;
+							$key_wrong = $los . '_wrong_' . $cot;
+							$key_perc = 'PERCENTAGE  ' . $los . '_' . $cot;
+							$all_names = [];
+							if (isset($data[$key_correct])) {
+								foreach ($data[$key_correct] as $name => $count) {
+									$all_names[] = $name;
+								}
+							}
+							if (isset($data[$key_wrong])) {
+								foreach ($data[$key_wrong] as $name => $count) {
+									$all_names[] = $name;
+								}
+							}
+							$all_names_with_outcome = [];
+							$to_sort_by = [];
+							foreach (array_unique($all_names) as $name) {
+								$percent = (((int) @$data[$key_correct][$name] / ((int) @$data[$key_correct][$name] + (int) @$data[$key_wrong][$name])) * 100);
+								$to_sort_by[] = $percent;
+								unset($results[$strategy_name][$key_perc][$name]);
+								$results[$strategy_name][$key_perc][$name] = $percent;
+							}
+							if (count($to_sort_by)) {
+								array_multisort($to_sort_by, $results[$strategy_name][$key_perc]);
+							}
+						}
+					}
 
 					if ($results[$strategy_name]['total_longs']) {
 						unset($results[$strategy_name]['% PERCENTAGE LONG win']);
@@ -306,14 +327,6 @@ class EvaluateStrategiesCommand extends Command {
 						$perc = $results[$strategy_name]['% PERCENTAGE WIN'] = ((($results[$strategy_name]['total_wins']) / $results[$strategy_name]['positions_count']) * 100);
 					}
 
-					// get avg bound range
-//					if(count($results[$strategy_name]['avg_stop_take_range'])) {
-//						$results[$strategy_name]['avg_stop_take_range'] = array_sum($results[$strategy_name]['avg_stop_take_range']) / count($results[$strategy_name]['avg_stop_take_range']);
-//					} else {
-//						$results[$strategy_name]['avg_stop_take_range'] = 'null';
-//					}
-
-
 					$percs[] = $perc;
 				}
 				array_multisort($percs, $results);
@@ -326,9 +339,40 @@ class EvaluateStrategiesCommand extends Command {
 				if (empty($significant_results)) {
 					$significant_results = $results;
 				}
-				file_put_contents('/home/terry/results/eurusd_MANY_IND_COMBINATIONs_any_candle_1and5mand15m_Intervals', "\n\n\nprinted:" . print_r($significant_results, 1) . ' ' . print_r('min so far ' . date('Y-m-d H:i:s', $min), 1) . "\n\n $instrument: Skipped $skipped due to incomplete data");
+				file_put_contents('/home/terry/results/eurusd_QUAD_MANY_IND_COMBINATIONs_and_several_BOUNDS_any_candle_1and5mand15m_Intervals', "\n\n\nprinted:" . print_r($significant_results, 1) . ' ' . print_r('min so far ' . date('Y-m-d H:i:s', $min), 1) . "\n\n $instrument: Skipped $skipped due to incomplete data");
+
 
 				echo "\n\n $instrument: Skipped $skipped due to incomplete data";
+				echo "\n\n $instrument: Inserting ";
+
+				$tom_strategy_knowledge = new Models\tom_strategy_knowledge();
+				$years_of_data = ($min - $start_min) / 3.154e+7;
+			}
+			if (!($min % 1296000/* 15 days */) || $min == $end_min) {
+				foreach ($results as $result) {
+					$unique_fields = [
+						'strategy_name' => $result['strategy_name']
+						, 'bounds_strategy_name' => $result['bounds_strategy_name']
+						, 'instrument' => $instrument];
+					$data = [
+						'percentage_win' => (float) @$result['% PERCENTAGE WIN'] * $years_of_data
+						, 'percentage_long_win' => (float) @$result['% PERCENTAGE LONG win'] * $years_of_data
+						, 'percentage_short_win' => (float) @$result['% PERCENTAGE SHORT win'] * $years_of_data
+						, 'avg_stop_take_range' => (float) @$result['avg_stop_take_range']
+						, 'avg_long_profit' => (float) @$result['avg_long_profit']
+						, 'avg_short_profit' => (float) @$result['avg_short_profit']
+						, 'avg_profit' => (float) @$result['avg_profit']
+						, 'long_wins_per_year' => (float) @$result['long_wins'] * $years_of_data
+						, 'short_wins_per_year' => (float) @$result['short_wins'] * $years_of_data
+						, 'long_loses_per_year' => (float) @$result['long_loses'] * $years_of_data
+						, 'short_loses_per_year' => (float) @$result['short_loses'] * $years_of_data
+						, 'timeout_loses_per_year' => (float) @$result['timeout_loses'] * $years_of_data
+						, 'longs_per_year' => (float) @$result['total_longs'] * $years_of_data
+						, 'shorts_per_year' => (float) @$result['total_shorts'] * $years_of_data
+						, 'indicator_count' => (int) @$result['indicator_count']
+					];
+					$tom_strategy_knowledge::updateOrCreate($unique_fields, $data);
+				}
 			}
 		}
 	}
@@ -338,7 +382,8 @@ class EvaluateStrategiesCommand extends Command {
 			$new = array_merge($curr, array($arr[$i]));
 			if ($level == 1) {
 				sort($new);
-				if (!in_array($new, $result)) {
+				if (!in_array($new, $result) // unique entries only
+						&& count(array_unique($new)) == count($new)/* distinct sets only */) {
 					$result[] = $new;
 				}
 			} else {
@@ -347,16 +392,4 @@ class EvaluateStrategiesCommand extends Command {
 		}
 	}
 
-	function unique_combinations($list) {
-		$size = count($list[0]);
-		$unique_list = [];
-		foreach ($list as $items) {
-			if (count(array_unique($items)) == $size) {
-				$unique_list[] = $items;
-			}
-		}
-		return $unique_list;
-	}
-
 }
-

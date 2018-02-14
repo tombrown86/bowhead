@@ -1158,6 +1158,12 @@ trait Strategies
 				return $long ? [$current_price - round(($current_price * (10 / $leverage)) / 100, 5), $current_price + round(($current_price * (20 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (10 / $leverage)) / 100, 5), $current_price - round(($current_price * (20 / $leverage)) / 100, 5)];
 			case 'perc_20_20':
 				return $long ? [$current_price - round(($current_price * (20 / $leverage)) / 100, 5), $current_price + round(($current_price * (20 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (20 / $leverage)) / 100, 5), $current_price - round(($current_price * (20 / $leverage)) / 100, 5)];
+			case 'perc_30_30':
+				return $long ? [$current_price - round(($current_price * (30 / $leverage)) / 100, 5), $current_price + round(($current_price * (30 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (30 / $leverage)) / 100, 5), $current_price - round(($current_price * (30 / $leverage)) / 100, 5)];
+			case 'perc_30_40':
+				return $long ? [$current_price - round(($current_price * (30 / $leverage)) / 100, 5), $current_price + round(($current_price * (40 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (30 / $leverage)) / 100, 5), $current_price - round(($current_price * (40 / $leverage)) / 100, 5)];
+			case 'perc_40_40':
+				return $long ? [$current_price - round(($current_price * (40 / $leverage)) / 100, 5), $current_price + round(($current_price * (40 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (40 / $leverage)) / 100, 5), $current_price - round(($current_price * (40 / $leverage)) / 100, 5)];
 			case 'fib_r1s1':
 				$fibs = $this->calcFibonacci($data);
 				return $long ? [$fibs['S1'], $fibs['R1']] : [$fibs['R1'], $fibs['S1']];
