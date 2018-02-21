@@ -40,6 +40,7 @@ class Kernel extends ConsoleKernel
 		Commands\HistDataBackfillCommand::class,
 		Commands\EvaluateStrategies2Command::class,
 		Commands\RecordSuccessCommand::class,
+		Commands\ForexTesterBackfillCommand::class,
     ];
 
     /**

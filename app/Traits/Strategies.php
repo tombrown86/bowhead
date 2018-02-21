@@ -1151,6 +1151,58 @@ trait Strategies
 		return ['signal' => 'none'];
 	}
 
+	function check_terry_knowledge($pair, $indicators, $candles, $interval='1m') {
+		// find any candle first
+		$long_candle = $short_candle = FALSE;
+		if (isset($candles['current'])) {
+			foreach ($candles['current'] as $candle_value) {
+				if ($candle_value > 0) {
+					$long_candle = TRUE;
+				} else if ($candle_value < 0) {
+					$short_candle = TRUE;
+				}
+			}
+		}
+		if ($long_candle || $short_candle) {
+			$long_indicators = $short_indicators = [];
+			foreach($indicators as $indicator_name => $indicator_value) {
+				if($indicator_value > 0) {
+					$long_indicators[] = $indicator_name;
+				}
+				else if($indicator_value < 0) {
+					$short_indicators[] = $indicator_name;
+				}
+			}
+			foreach(['long', 'short'] as $los) {
+				$indicators = ${$los.'_indicators'};
+				if(count($indicators)) {
+					sort($indicators);
+					$doubles = [];
+					$this->combinations($indicators, 2, $doubles);
+					$triples = [];
+					$this->combinations($indicators, 3, $triples);
+					$quadruples = [];
+					$this->combinations($indicators, 4, $quadruples);
+					$indicator_combinations = array_merge($doubles, $triples, $quadruples);
+					$indicator_combinations = array_walk($indicator_combinations, function($indicators) {return 'IC+1cand__'.implode('_', $indicators);});
+
+					$knowledge = \DB::table('terry_strategy_knowledge')
+						->select(DB::raw('*'))
+						->where('instrument', $pair)
+						->where('percentage_'.$los.'_win', '>', 70) // filter out incomplete results
+						->where('test_confirmations', '>', 5)
+						->where('strategy_name', 'IN', $indicator_combinations) 
+						->order('avg_'.$los.'_profit')
+						->get();
+					if(count($knowledge)) {
+						return ['signal' => $los, 'bounds_method'=>$knowledge[0]['bounds_strategy_name'], 'long_matches' => $long_matches];
+					}
+				}
+			}
+		}
+		return ['signal' => 'none'];
+	}
+
 
 	function get_bounds($method, $data, $long, $current_price, $leverage) {
 		switch ($method) {
@@ -1181,4 +1233,18 @@ trait Strategies
 		}
 	}
 
+	function combinations($arr, $level, &$result, $curr = array()) {
+		for ($i = 0; $i < count($arr); $i++) {
+			$new = array_merge($curr, array($arr[$i]));
+			if ($level == 1) {
+				sort($new);
+				if (!in_array($new, $result) // unique entries only
+						&& count(array_unique($new)) == count($new)/*distinct sets only*/) {
+					$result[] = $new;
+				}
+			} else {
+				$this->combinations($arr, $level - 1, $result, $new);
+			}
+		}
+	}
 }

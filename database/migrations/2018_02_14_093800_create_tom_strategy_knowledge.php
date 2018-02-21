@@ -3,7 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 
-class CreateTomStrategyKnowledge extends Migration {
+class CreateTerryStrategyKnowledge extends Migration {
 
 	/**
 	 * Run the migrations.

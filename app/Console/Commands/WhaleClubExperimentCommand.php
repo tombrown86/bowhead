@@ -128,12 +128,12 @@ class WhaleClubExperimentCommand extends Command {
 
 					$candles = $cand->allCandles($instrument, $data);
 					$indicators = $ind->allSignals($instrument, $data);
-					$signals = $this->signals(1, 0, [$instrument], $data);
+//					$signals = $this->signals(1, 0, [$instrument], $data);
 
-					$result = $this->check_for_special_combo($instrument, $indicators, $candles, $interval);
+					$result = $this->check_terry_knowledge($instrument, $indicators, $candles, $interval);
 
 					$direction = 0;
-					if ($result['signal'] == 'long') {
+					if ($resfterrult['signal'] == 'long') {
 						$direction = 1;
 						echo "\n-$instrument ($interval): Found long signal... " . print_r($result, 1);
 					} elseif ($result['signal'] == 'short') {
@@ -157,7 +157,7 @@ class WhaleClubExperimentCommand extends Command {
 
 									$console->buzzer();
 									$levereage = 222;
-									list($stop_loss, $take_profit) = $this->get_bounds(/*$result['bounds_method']*/'perc_20_20', $data, FALSE, $current_price, $levereage);
+									list($stop_loss, $take_profit) = $this->get_bounds($result['bounds_method'], $data, FALSE, $current_price, $levereage);
 
 									$order = [
 										'direction' => 'short'

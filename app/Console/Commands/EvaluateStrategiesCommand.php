@@ -57,6 +57,8 @@ class EvaluateStrategiesCommand extends Command {
 	 *  this is the part of the command that executes.
 	 */
 	public function handle() {
+		$terry_strategy_knowledge = new Models\terry_strategy_knowledge();
+		
 		echo "PRESS 'q' TO QUIT AND CLOSE ALL POSITIONS\n\n\n";
 		stream_set_blocking(STDIN, 0);
 
@@ -68,49 +70,106 @@ class EvaluateStrategiesCommand extends Command {
 
 		$instrument = 'EUR/USD';
 		$interval = '1m';
-
+		$skip_weekends = FALSE;
+		$results_filename = 'eurusd_QUAD_MANY_IND_COMBINATIONs_and_several_BOUNDS_any_candle_1and5mand15m_Intervals';
+		$results_obj_filename = $results_filename.'_RESULTS_OBJ';
+		
 		$strategy_open_position = [];
 
 		$list_indicators = array('adx', 'aroonosc', 'cmo', 'sar', 'cci', 'mfi', 'obv', 'stoch', 'rsi', 'macd', 'bollingerBands', 'atr', 'er', 'hli', 'ultosc', 'willr', 'roc', 'stochrsi');
-		$list_signals = ['rsi', 'stoch', 'stochrsi', 'macd', 'adx', 'willr', 'cci', 'atr', 'hli', 'ultosc', 'roc', 'er'];
+//		$list_signals = ['rsi', 'stoch', 'stochrsi', 'macd', 'adx', 'willr', 'cci', 'atr', 'hli', 'ultosc', 'roc', 'er'];
 
 
 		$doubles = [];
 		$this->combinations($list_indicators, 2, $doubles);
-		$triplets = [];
-		$this->combinations($list_indicators, 3, $triplets);
+		$triples = [];
+		$this->combinations($list_indicators, 3, $triples);
 		$quadruples = [];
 		$this->combinations($list_indicators, 4, $quadruples);
-		$indicator_combinations = array_merge($doubles, $triplets, $quadruples);
+		$indicator_combinations = array_merge($doubles, $triples, $quadruples);
 
 
 #		for ($take = 150; $take <= 150; $take+=25) {
 		$skipped = 0;
 		$take = 150;
+//		$results = json_decode(file_get_contents($results_obj_filename));
 		$results = [];
-		$end_min = strtotime('2018-01-01 05:00:00');
-		$start_min = strtotime('2017-01-01 05:00:00');
+		$end_min = strtotime('2017-12-10 05:00:00');
+		$start_min = strtotime('2016-01-01 05:00:00');
 		$spread = '0.01';
 		$leverage = 222;
 
 		for ($min = $start_min; $min <= $end_min; $min += 60) {
+			if($skip_weekends && 
+					(in_array(date('w', $min), [0,6])
+						|| in_array(date('w', $min + 7200), [0,6]))) { // continue if weekend now or in under 2 hours 
+				continue;
+			}
+			
 			foreach ($strategy_open_position as $strategy => $etime) {
 				if ($etime < $min) {
 					unset($strategy_open_position[$strategy]);
 				}
 			}
-			foreach (['1m', '5m', '15m', /* '30m', '1h' */] as $interval) {
-				$win_or_lose_short = $win_or_lose_long = []; //keep results here as we have multiple strats to check 
-				$data = $this->getRecentData($instrument, 200, false, date('H'), $interval, false, $min, false);
+			
+			foreach (['1m', '5m', '15m', '30m', '1h'] as $interval) {
+				$secs_since_last_sunday = $min - strtotime(date('Y-m-d 23:59:59', strtotime('last Sunday', $min))) + 1; 
+				
+				// if skipping weekends, get max num of periods since end of weekend
+				
+				if($interval == '1m') {
+					$max_period = 300;
+					$periods_to_get = $skip_weekends ? floor($secs_since_last_sunday/60) : 365;
 
-				if (count($data['periods']) < 200) {
+					if($periods_to_get < 300) { // make sure there is a long enough range
+						continue;
+					}
+				}
+				if($interval == '5m') {
+					$periods_to_get = $skip_weekends ? floor($secs_since_last_sunday/(60*5)) : 365;
+					$max_period = 60 * 6;
+
+					if($periods_to_get < 200) { // make sure there is a long enough range
+						continue;
+					}
+				}
+				if($interval == '15m') {
+					$periods_to_get = $skip_weekends ? floor($secs_since_last_sunday/(60*15)) : 365;
+					$max_period = 60 * 16;
+
+					if($periods_to_get < 70) { // make sure there is a long enough range
+						continue;
+					}
+				}
+				if($interval == '30m') {
+					$periods_to_get = $skip_weekends ? floor($secs_since_last_sunday/(60*30)) : 365;
+					$max_period = 60 * 31;
+
+					if($periods_to_get < 50) { // make sure there is a long enough range
+						continue;
+					}
+				}
+				if($interval == '1h') {
+					$periods_to_get = $skip_weekends ? floor($secs_since_last_sunday/(60*60)) : 365;
+					$max_period = 60 * 61;
+
+					if($periods_to_get < 40) { // make sure there is a long enough range
+						continue;
+					}
+				}
+				
+				$win_or_lose_short = $win_or_lose_long = []; //keep results here as we have multiple strats to check 
+				
+				$data = $this->getRecentData($instrument, $periods_to_get, false, date('H'), $interval, false, $min, false);
+				if (count($data['periods']) < $periods_to_get) {
 					$skipped ++;
-					echo "\n !!!!!!!!!!!!!!! Less than 200 periods returned ($min)! \n";
+					echo "\n !!!!!!!!!!!!!!! Less than $periods_to_get periods returned ($min) for $interval! \n";
 					continue;
 				}
-				if (max($data['periods']) > 500) {
+				if (max($data['periods']) > $max_period) {
 					$skipped ++;
-					echo "\n !!!!!!!!!!!!!!! Skipping, max period was " . max($data['periods']) . "! \n";
+					echo "\n !!!!!!!!!!!!!!! Skipping, max period was " . max($data['periods']) . "! ($min) for $interval \n";
+					file_put_contents('/tmp/periodcheck', "\n !!!!!!!!!!!!!!! Skipping, max period was " . max($data['periods']) . "! ($min) for $interval \n", FILE_APPEND);
 					continue;
 				}
 				$current_price = ($data['high'][count($data['low']) - 1] + $data['low'][count($data['low']) - 1]) / 2;
@@ -165,6 +224,10 @@ class EvaluateStrategiesCommand extends Command {
 
 							if ($overbought XOR $underbought) {
 								foreach (['demark', 'fib_r2s2', 'fib_r3s3', 'perc_20_20', 'perc_30_40', 'perc_40_40'/* 'perc_10_20' */] as $bounds_method) {
+									if($interval != '1m' && $interval != '5m' && $bounds_method == 'demark') {
+										// demark algoritm fails with long intervals!  apparently it's no good for them anyway, so skipping rather than trying to resolve it
+										continue;
+									}
 									$bounds_strategy_name = "$bounds_method $strategy_name";
 									if ($overbought) {
 										$long = FALSE;
@@ -261,8 +324,9 @@ class EvaluateStrategiesCommand extends Command {
 
 										$results[$bounds_strategy_name]['avg_stop_take_range'] = (($results[$bounds_strategy_name]['avg_stop_take_range'] * ($results[$bounds_strategy_name]['positions_count'] - 1)) + abs($take - $stop)) / $results[$bounds_strategy_name]['positions_count'];
 
-
-										$profit_percentage = $leverage * ((($result['win'] ? abs($take - $current_price) : -abs($stop - $current_price)) / $current_price) - $spread);
+										// enter with whole spread as offset (rather than worry ourselves with separate ask + bid)
+										$current_price += $long ? + ($spread/100)*$current_price : -($spread/100)*$current_price;
+										$profit_percentage = $leverage * (((($result['win'] ? abs($take - $current_price) : -abs($stop - $current_price)) / $current_price) * 100));
 
 										if ($long) {
 											$results[$bounds_strategy_name]['avg_long_profit'] = (($results[$bounds_strategy_name]['avg_long_profit'] * ($results[$bounds_strategy_name]['total_longs'] - 1)) + $profit_percentage) / $results[$bounds_strategy_name]['total_longs'];
@@ -339,55 +403,44 @@ class EvaluateStrategiesCommand extends Command {
 				if (empty($significant_results)) {
 					$significant_results = $results;
 				}
-				file_put_contents('/home/terry/results/eurusd_QUAD_MANY_IND_COMBINATIONs_and_several_BOUNDS_any_candle_1and5mand15m_Intervals', "\n\n\nprinted:" . print_r($significant_results, 1) . ' ' . print_r('min so far ' . date('Y-m-d H:i:s', $min), 1) . "\n\n $instrument: Skipped $skipped due to incomplete data");
-
+				file_put_contents("/home/terry/results/$results_filename", "\n\n\nprinted:" . print_r($significant_results, 1) . ' ' . print_r('min so far ' . date('Y-m-d H:i:s', $min), 1) . "\n\n $instrument: Skipped $skipped due to incomplete data");
 
 				echo "\n\n $instrument: Skipped $skipped due to incomplete data";
 				echo "\n\n $instrument: Inserting ";
 
-				$tom_strategy_knowledge = new Models\tom_strategy_knowledge();
-				$years_of_data = ($min - $start_min) / 3.154e+7;
 			}
 			if (!($min % 1296000/* 15 days */) || $min == $end_min) {
+				// store results obj JSON occasionally, so this process can be resumed
+				file_put_contents($results_obj_filename, json_encode($results));
 				foreach ($results as $result) {
+					
+					$days_of_data = ($min - $start_min) / 60*60*24;
+//					print_r($result);
 					$unique_fields = [
 						'strategy_name' => $result['strategy_name']
 						, 'bounds_strategy_name' => $result['bounds_strategy_name']
 						, 'instrument' => $instrument];
 					$data = [
-						'percentage_win' => (float) @$result['% PERCENTAGE WIN'] * $years_of_data
-						, 'percentage_long_win' => (float) @$result['% PERCENTAGE LONG win'] * $years_of_data
-						, 'percentage_short_win' => (float) @$result['% PERCENTAGE SHORT win'] * $years_of_data
+						'percentage_win' => (float) @$result['% PERCENTAGE WIN']
+						, 'percentage_long_win' => (float) @$result['% PERCENTAGE LONG win'] 
+						, 'percentage_short_win' => (float) @$result['% PERCENTAGE SHORT win'] 
 						, 'avg_stop_take_range' => (float) @$result['avg_stop_take_range']
 						, 'avg_long_profit' => (float) @$result['avg_long_profit']
 						, 'avg_short_profit' => (float) @$result['avg_short_profit']
 						, 'avg_profit' => (float) @$result['avg_profit']
-						, 'long_wins_per_year' => (float) @$result['long_wins'] * $years_of_data
-						, 'short_wins_per_year' => (float) @$result['short_wins'] * $years_of_data
-						, 'long_loses_per_year' => (float) @$result['long_loses'] * $years_of_data
-						, 'short_loses_per_year' => (float) @$result['short_loses'] * $years_of_data
-						, 'timeout_loses_per_year' => (float) @$result['timeout_loses'] * $years_of_data
-						, 'longs_per_year' => (float) @$result['total_longs'] * $years_of_data
-						, 'shorts_per_year' => (float) @$result['total_shorts'] * $years_of_data
+						, 'long_wins_per_day' => (float) @$result['long_wins'] * $days_of_data
+						, 'short_wins_per_day' => (float) @$result['short_wins'] * $days_of_data
+						, 'long_loses_per_day' => (float) @$result['long_loses'] * $days_of_data
+						, 'short_loses_per_day' => (float) @$result['short_loses'] * $days_of_data
+						, 'timeout_loses_per_day' => (float) @$result['timeout_loses'] * $days_of_data
+						, 'longs_per_day' => (float) @$result['total_longs'] * $days_of_data
+						, 'shorts_per_day' => (float) @$result['total_shorts'] * $days_of_data
 						, 'indicator_count' => (int) @$result['indicator_count']
+						, 'test_confirmations' => (int) @$result['positions_count']
 					];
-					$tom_strategy_knowledge::updateOrCreate($unique_fields, $data);
+//					print_r($data);die;
+					$terry_strategy_knowledge::updateOrCreate($unique_fields, $data);
 				}
-			}
-		}
-	}
-
-	function combinations($arr, $level, &$result, $curr = array()) {
-		for ($i = 0; $i < count($arr); $i++) {
-			$new = array_merge($curr, array($arr[$i]));
-			if ($level == 1) {
-				sort($new);
-				if (!in_array($new, $result) // unique entries only
-						&& count(array_unique($new)) == count($new)/* distinct sets only */) {
-					$result[] = $new;
-				}
-			} else {
-				$this->combinations($arr, $level - 1, $result, $new);
 			}
 		}
 	}

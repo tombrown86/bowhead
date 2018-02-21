@@ -526,7 +526,7 @@ trait OHLC
  		  $periodcheck = $current_time - $ptime;
 		  if($periodcheck > $variance) {
 		      echo "Most recent data is too old... \$periodcheck > \$variance ($periodcheck > $variance) ... \$current_time=$current_time, \$ptime=$ptime, \$variance=$variance)";
-//		      $die_on_large_period && die();
+		      $die_on_large_period && die();
 			  return;
 		  }
 		  $periods[] = $periodcheck;
@@ -538,7 +538,7 @@ trait OHLC
 			echo $periodcheck . ' > ' . $variance.' ' .date('Y-m-d H i s',$ftime) . '  YOU HAVE '.$validperiods.' PERIODS OF VALID PRICE DATA OUT OF '.$limit.'. Please ensure price sync is running and wait for additional data to be logged before trying again. Additionally you could use a smaller time period if available.'."\n";
 			$die_on_large_period && die();
 		}
-                $periods[] = $periodcheck;
+		$periods[] = $periodcheck;
 		$validperiods++;
 	   }
 	   $ptime = $ftime;	
