@@ -68,7 +68,7 @@ class ForexTesterBackfillCommand extends Command {
 			while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
 				$datetime = $time + ($data[0]/1000);
 				$date = date('Y-m-d H:i:s', $datetime);
-				if($datetime < strtotime('2016-03-15')) {
+				if($datetime < strtotime('2017-12-11')) {
 					continue;
 				}
 //				if($datetime > strtotime('2017-03-25 23:00:00')) {

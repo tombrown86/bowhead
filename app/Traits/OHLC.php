@@ -1,24 +1,25 @@
 <?php
+
 /**
  * Created by PhpStorm.
  * User: joeldg
  * Date: 6/26/17
  * Time: 4:03 PM
  */
+
 namespace Bowhead\Traits;
 
 use Illuminate\Support\Facades\DB;
 
-trait OHLC
-{
-    /**
-     * @param $ticker
-     *
-     * @return bool
-     */
-    public function markOHLC($ticker, $bf = false, $bf_pair = 'BTC/USD')
-    {
-		if($bf == 'raw') {
+trait OHLC {
+
+	/**
+	 * @param $ticker
+	 *
+	 * @return bool
+	 */
+	public function markOHLC($ticker, $bf = false, $bf_pair = 'BTC/USD') {
+		if ($bf == 'raw') {
 			$instrument = $bf_pair;
 			extract($ticker);
 			$now = strtotime($ctime);
@@ -53,7 +54,7 @@ trait OHLC
 				$instrument = $ticker['tick']['instrument'];
 				$volume = 0;
 			}
-			
+
 			/** tick table update */
 			$ins = \DB::insert("
 				INSERT INTO bowhead_ohlc_tick
@@ -69,70 +70,69 @@ trait OHLC
 		}
 
 
-        /** 1m table update **/
+		/** 1m table update * */
+		$open1 = null;
+		$close1 = null;
+		$high1 = null;
+		$low1 = null;
+		$last1timeid = 0;
+		$timeid = date("YmdHi", strtotime($timeid));
 
-        $open1 = null;
-        $close1 = null;
-        $high1 = null;
-        $low1 = null;
-	$last1timeid=0;
-        $timeid = date("YmdHi", strtotime($timeid));
+		$last1m = \DB::table('bowhead_ohlc_1m')->select(DB::raw('MAX(timeid) AS timeid'))
+				->where('instrument', $instrument)
+				->where('timeid', '<', $timeid)
+				->get();
 
-        $last1m = \DB::table('bowhead_ohlc_1m')->select(DB::raw('MAX(timeid) AS timeid'))
-            ->where('instrument', $instrument)
-            ->where('timeid', '<', $timeid)
-            ->get();
+		foreach ($last1m as $last1) {
+			$last1timeid = $last1->timeid;
+			$last1timeid = date("YmdHi", strtotime($last1timeid));
+		}
 
-        foreach ($last1m as $last1) {
-            $last1timeid = $last1->timeid;
-            $last1timeid = date("YmdHi", strtotime($last1timeid));
-        }
+		if ($last1timeid < $timeid) {
 
-        if ($last1timeid < $timeid) {
+			/* Get High and Low from ticker data for insertion */
+			$last1timeids = date("YmdHis", strtotime(date("YmdHi", strtotime("-1 minutes", $now))));
+			$accum1ma = \DB::table('bowhead_ohlc_tick')->select(DB::raw('MAX(high) as high, MIN(low) as low'))
+					->where('instrument', $instrument)
+					->where('timeid', '>=', $last1timeids)
+					->where('timeid', '<=', ($last1timeids + 59))
+					->get();
 
-            /* Get High and Low from ticker data for insertion */
-            $last1timeids = date("YmdHis", strtotime(date("YmdHi", strtotime("-1 minutes", $now))));
-            $accum1ma = \DB::table('bowhead_ohlc_tick')->select(DB::raw('MAX(high) as high, MIN(low) as low'))
-                ->where('instrument', $instrument)
-                ->where('timeid', '>=', $last1timeids)
-                ->where('timeid', '<=', ($last1timeids + 59))
-                ->get();
-
-            foreach ($accum1ma as $accum1a) {
-                $high1 = $accum1a->high;
-                $low1 = $accum1a->low;
-            }
+			foreach ($accum1ma as $accum1a) {
+				$high1 = $accum1a->high;
+				$low1 = $accum1a->low;
+			}
 
 
-            /* Get Open price from ticker data and last minute */
-            $accum1mb = \DB::table('bowhead_ohlc_tick')->select(DB::raw('open AS open'))
-                ->where('instrument', $instrument)
-                ->where('timeid', '>=', $last1timeids)
-                ->where('timeid', '<=', ($last1timeids + 59))
-                ->limit(1)
-                ->get();
+			/* Get Open price from ticker data and last minute */
+			$accum1mb = \DB::table('bowhead_ohlc_tick')->select(DB::raw('open AS open'))
+					->where('instrument', $instrument)
+					->where('timeid', '>=', $last1timeids)
+					->where('timeid', '<=', ($last1timeids + 59))
+					->limit(1)
+					->get();
 
-            foreach ($accum1mb as $accum1b) {
-                $open1 = $accum1b->open;
-            }
+			foreach ($accum1mb as $accum1b) {
+				$open1 = $accum1b->open;
+			}
 
-            /* Get close price from ticker data and last minute */
-            $accum1mc = \DB::table('bowhead_ohlc_tick')->select(DB::raw('close AS close'))
-                ->where('instrument', $instrument)
-                ->where('timeid', '>=', $last1timeids)
-                ->where('timeid', '<=', ($last1timeids + 59))
-                ->orderBy('ctime', 'desc')
-                ->limit(1)
-                ->get();
+			/* Get close price from ticker data and last minute */
+			$accum1mc = \DB::table('bowhead_ohlc_tick')->select(DB::raw('close AS close'))
+					->where('instrument', $instrument)
+					->where('timeid', '>=', $last1timeids)
+					->where('timeid', '<=', ($last1timeids + 59))
+					->orderBy('ctime', 'desc')
+					->limit(1)
+					->get();
 
-            foreach ($accum1mc as $accum1c) {
-                $close1 = $accum1c->close;
-            }
+			foreach ($accum1mc as $accum1c) {
+				$close1 = $accum1c->close;
+			}
 
 //die("$open1 $close1 ");
-            if ($open1 && $close1 && $high1 && $low1) {
-			
-                $ins = \DB::insert("
+			if ($open1 && $close1 && $high1 && $low1) {
+
+				$ins = \DB::insert("
             INSERT INTO bowhead_ohlc_1m 
             (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`, ctime)
             VALUES
@@ -143,63 +143,61 @@ trait OHLC
             `volume` = VALUES(`volume`),
             `close`  = VALUES(`close`)
         ");
-            }
+			}
+		}
 
-        }
+		/** 5m table update  * */
+		$open5 = null;
+		$close5 = null;
+		$high5 = null;
+		$low5 = null;
 
-        /** 5m table update  **/
+		$last5m = \DB::table('bowhead_ohlc_5m')->select(DB::raw('MAX(timeid) AS timeid'))
+				->where('instrument', $instrument)
+				->where('timeid', '<', $timeid)
+				->get();
+		foreach ($last5m as $last5) {
+			$last5timeid = $last5->timeid;
+			$last5timeid = date("YmdHi", strtotime("+4 minutes", strtotime($last5timeid)));
+		}
+		if ($last5timeid < $timeid) {
+			/* Get High and Low from 1m data for insertion */
+			$last5timeids = date("YmdHi", strtotime("-5 minutes", $now));
+			$accum5ma = \DB::table('bowhead_ohlc_1m')->select(DB::raw('MAX(high) as high, MIN(low) as low'))
+					->where('instrument', $instrument)
+					->where('timeid', '>=', $last5timeids)
+					->where('timeid', '<=', ($timeid))
+					->get();
 
-        $open5 = null;
-        $close5 = null;
-        $high5 = null;
-        $low5 = null;
+			foreach ($accum5ma as $accum5a) {
+				$high5 = $accum5a->high;
+				$low5 = $accum5a->low;
+			}
 
-        $last5m = \DB::table('bowhead_ohlc_5m')->select(DB::raw('MAX(timeid) AS timeid'))
-            ->where('instrument', $instrument)
-            ->where('timeid', '<', $timeid)
-            ->get();
-        foreach ($last5m as $last5) {
-            $last5timeid = $last5->timeid;
-            $last5timeid = date("YmdHi", strtotime("+4 minutes", strtotime($last5timeid)));
-        }
-        if ($last5timeid < $timeid) {
-            /* Get High and Low from 1m data for insertion */
-            $last5timeids = date("YmdHi", strtotime("-5 minutes", $now));
-            $accum5ma = \DB::table('bowhead_ohlc_1m')->select(DB::raw('MAX(high) as high, MIN(low) as low'))
-                ->where('instrument', $instrument)
-                ->where('timeid', '>=', $last5timeids)
-                ->where('timeid', '<=', ($timeid))
-                ->get();
+			/* Get Open price from 1m data and last 5 minutes */
+			$accum5mb = \DB::table('bowhead_ohlc_1m')->select(DB::raw('*'))
+					->where('instrument', $instrument)
+					->where('timeid', '>=', $last5timeids)
+					->where('timeid', '<=', ($timeid))
+					->limit(1)
+					->get();
+			foreach ($accum5mb as $accum5b) {
+				$open5 = $accum5b->open;
+			}
 
-            foreach ($accum5ma as $accum5a) {
-                $high5 = $accum5a->high;
-                $low5 = $accum5a->low;
-            }
-
-            /* Get Open price from 1m data and last 5 minutes */
-            $accum5mb = \DB::table('bowhead_ohlc_1m')->select(DB::raw('*'))
-                ->where('instrument', $instrument)
-                ->where('timeid', '>=', $last5timeids)
-                ->where('timeid', '<=', ($timeid))
-                ->limit(1)
-                ->get();
-            foreach ($accum5mb as $accum5b) {
-                $open5 = $accum5b->open;
-            }
-
-            /* Get Close price from 1m data and last 5 minutes */
-            $accum5mc = \DB::table('bowhead_ohlc_1m')->select(DB::raw('*'))
-                ->where('instrument', $instrument)
-                ->where('timeid', '>=', $last5timeids)
-                ->where('timeid', '<=', ($timeid))
-                ->orderBy('ctime', 'desc')
-                ->limit(1)
-                ->get();
-            foreach ($accum5mc as $accum5c) {
-                $close5 = $accum5c->close;
-            }
-            if ($open5 && $close5 && $low5 && $high5) {
-                $ins = \DB::insert("
+			/* Get Close price from 1m data and last 5 minutes */
+			$accum5mc = \DB::table('bowhead_ohlc_1m')->select(DB::raw('*'))
+					->where('instrument', $instrument)
+					->where('timeid', '>=', $last5timeids)
+					->where('timeid', '<=', ($timeid))
+					->orderBy('ctime', 'desc')
+					->limit(1)
+					->get();
+			foreach ($accum5mc as $accum5c) {
+				$close5 = $accum5c->close;
+			}
+			if ($open5 && $close5 && $low5 && $high5) {
+				$ins = \DB::insert("
             INSERT INTO bowhead_ohlc_5m 
             (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`, ctime)
             VALUES
@@ -210,61 +208,61 @@ trait OHLC
             `volume` = VALUES(`volume`),
             `close`  = VALUES(`close`)
         ");
-            }
-        }
+			}
+		}
 
-        /** 15m table update **/
-        $open15 = null;
-        $close15 = null;
-        $high15 = null;
-        $low15 = null;
+		/** 15m table update * */
+		$open15 = null;
+		$close15 = null;
+		$high15 = null;
+		$low15 = null;
 
-        $last15m = \DB::table('bowhead_ohlc_15m')->select(DB::raw('MAX(timeid) AS timeid'))
-            ->where('instrument', $instrument)
-            ->where('timeid', '<', $timeid)
-            ->get();
-        foreach ($last15m as $last15) {
-            $last15timeid = $last15->timeid;
-            $last15timeid = date("YmdHi", strtotime("+14 minutes", strtotime($last15timeid)));
-        }
-        if ($last15timeid < $timeid) {
-            /* Get High and Low from 5m data for insertion */
-            $last15timeids = date("YmdHi", strtotime("-15 minutes", $now));
-            $accum15ma = \DB::table('bowhead_ohlc_5m')->select(DB::raw('MAX(high) as high, MIN(low) as low'))
-                ->where('instrument', $instrument)
-                ->where('timeid', '>=', $last15timeids)
-                ->where('timeid', '<=', ($timeid))
-                ->get();
+		$last15m = \DB::table('bowhead_ohlc_15m')->select(DB::raw('MAX(timeid) AS timeid'))
+				->where('instrument', $instrument)
+				->where('timeid', '<', $timeid)
+				->get();
+		foreach ($last15m as $last15) {
+			$last15timeid = $last15->timeid;
+			$last15timeid = date("YmdHi", strtotime("+14 minutes", strtotime($last15timeid)));
+		}
+		if ($last15timeid < $timeid) {
+			/* Get High and Low from 5m data for insertion */
+			$last15timeids = date("YmdHi", strtotime("-15 minutes", $now));
+			$accum15ma = \DB::table('bowhead_ohlc_5m')->select(DB::raw('MAX(high) as high, MIN(low) as low'))
+					->where('instrument', $instrument)
+					->where('timeid', '>=', $last15timeids)
+					->where('timeid', '<=', ($timeid))
+					->get();
 
-            foreach ($accum15ma as $accum15a) {
-                $high15 = $accum15a->high;
-                $low15 = $accum15a->low;
-            }
+			foreach ($accum15ma as $accum15a) {
+				$high15 = $accum15a->high;
+				$low15 = $accum15a->low;
+			}
 
-            /* Get Open price from 5m data and last 15 minutes */
-            $accum15mb = \DB::table('bowhead_ohlc_5m')->select(DB::raw('*'))
-                ->where('instrument', $instrument)
-                ->where('timeid', '>=', $last15timeids)
-                ->where('timeid', '<=', ($timeid))
-                ->limit(1)
-                ->get();
-            foreach ($accum15mb as $accum15b) {
-                $open15 = $accum15b->open;
-            }
+			/* Get Open price from 5m data and last 15 minutes */
+			$accum15mb = \DB::table('bowhead_ohlc_5m')->select(DB::raw('*'))
+					->where('instrument', $instrument)
+					->where('timeid', '>=', $last15timeids)
+					->where('timeid', '<=', ($timeid))
+					->limit(1)
+					->get();
+			foreach ($accum15mb as $accum15b) {
+				$open15 = $accum15b->open;
+			}
 
-            /* Get Close price from 5m data and last 15 minutes */
-            $accum15mc = \DB::table('bowhead_ohlc_5m')->select(DB::raw('*'))
-                ->where('instrument', $instrument)
-                ->where('timeid', '>=', $last15timeids)
-                ->where('timeid', '<=', ($timeid))
-                ->orderBy('ctime', 'desc')
-                ->limit(1)
-                ->get();
-            foreach ($accum15mc as $accum15c) {
-                $close15 = $accum15c->close;
-            }
-            if ($open15 && $close15 && $low15 && $high15) {
-                $ins = \DB::insert("
+			/* Get Close price from 5m data and last 15 minutes */
+			$accum15mc = \DB::table('bowhead_ohlc_5m')->select(DB::raw('*'))
+					->where('instrument', $instrument)
+					->where('timeid', '>=', $last15timeids)
+					->where('timeid', '<=', ($timeid))
+					->orderBy('ctime', 'desc')
+					->limit(1)
+					->get();
+			foreach ($accum15mc as $accum15c) {
+				$close15 = $accum15c->close;
+			}
+			if ($open15 && $close15 && $low15 && $high15) {
+				$ins = \DB::insert("
             INSERT INTO bowhead_ohlc_15m 
             (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`, ctime)
             VALUES
@@ -275,61 +273,61 @@ trait OHLC
             `volume` = VALUES(`volume`),
             `close`  = VALUES(`close`)
         ");
-            }
-        }
+			}
+		}
 
-        /** 30m table update **/
-        $open30 = null;
-        $close30 = null;
-        $high30 = null;
-        $low30 = null;
+		/** 30m table update * */
+		$open30 = null;
+		$close30 = null;
+		$high30 = null;
+		$low30 = null;
 
-        $last30m = \DB::table('bowhead_ohlc_30m')->select(DB::raw('MAX(timeid) AS timeid'))
-            ->where('instrument', $instrument)
-            ->where('timeid', '<', $timeid)
-            ->get();
-        foreach ($last30m as $last30) {
-            $last30timeid = $last30->timeid;
-            $last30timeid = date("YmdHi", strtotime("+29 minutes", strtotime($last30timeid)));
-        }
-        if ($last30timeid < $timeid) {
-            /* Get High and Low from 15m data for insertion */
-            $last30timeids = date("YmdHi", strtotime("-30 minutes", $now));
-            $accum30ma = \DB::table('bowhead_ohlc_15m')->select(DB::raw('MAX(high) as high, MIN(low) as low'))
-                ->where('instrument', $instrument)
-                ->where('timeid', '>=', $last30timeids)
-                ->where('timeid', '<=', ($timeid))
-                ->get();
+		$last30m = \DB::table('bowhead_ohlc_30m')->select(DB::raw('MAX(timeid) AS timeid'))
+				->where('instrument', $instrument)
+				->where('timeid', '<', $timeid)
+				->get();
+		foreach ($last30m as $last30) {
+			$last30timeid = $last30->timeid;
+			$last30timeid = date("YmdHi", strtotime("+29 minutes", strtotime($last30timeid)));
+		}
+		if ($last30timeid < $timeid) {
+			/* Get High and Low from 15m data for insertion */
+			$last30timeids = date("YmdHi", strtotime("-30 minutes", $now));
+			$accum30ma = \DB::table('bowhead_ohlc_15m')->select(DB::raw('MAX(high) as high, MIN(low) as low'))
+					->where('instrument', $instrument)
+					->where('timeid', '>=', $last30timeids)
+					->where('timeid', '<=', ($timeid))
+					->get();
 
-            foreach ($accum30ma as $accum30a) {
-                $high30 = $accum30a->high;
-                $low30 = $accum30a->low;
-            }
+			foreach ($accum30ma as $accum30a) {
+				$high30 = $accum30a->high;
+				$low30 = $accum30a->low;
+			}
 
-            /* Get Open price from 15m data and last 30 minutes */
-            $accum30mb = \DB::table('bowhead_ohlc_15m')->select(DB::raw('*'))
-                ->where('instrument', $instrument)
-                ->where('timeid', '>=', $last30timeids)
-                ->where('timeid', '<=', ($timeid))
-                ->limit(1)
-                ->get();
-            foreach ($accum30mb as $accum30b) {
-                $open30 = $accum30b->open;
-            }
+			/* Get Open price from 15m data and last 30 minutes */
+			$accum30mb = \DB::table('bowhead_ohlc_15m')->select(DB::raw('*'))
+					->where('instrument', $instrument)
+					->where('timeid', '>=', $last30timeids)
+					->where('timeid', '<=', ($timeid))
+					->limit(1)
+					->get();
+			foreach ($accum30mb as $accum30b) {
+				$open30 = $accum30b->open;
+			}
 
-            /* Get Close price from 15m data and last 30 minutes */
-            $accum30mc = \DB::table('bowhead_ohlc_15m')->select(DB::raw('*'))
-                ->where('instrument', $instrument)
-                ->where('timeid', '>=', $last30timeids)
-                ->where('timeid', '<=', ($timeid))
-                ->orderBy('ctime', 'desc')
-                ->limit(1)
-                ->get();
-            foreach ($accum30mc as $accum30c) {
-                $close30 = $accum30c->close;
-            }
-            if ($open30 && $close30 && $low30 && $high30) {
-                $ins = \DB::insert("
+			/* Get Close price from 15m data and last 30 minutes */
+			$accum30mc = \DB::table('bowhead_ohlc_15m')->select(DB::raw('*'))
+					->where('instrument', $instrument)
+					->where('timeid', '>=', $last30timeids)
+					->where('timeid', '<=', ($timeid))
+					->orderBy('ctime', 'desc')
+					->limit(1)
+					->get();
+			foreach ($accum30mc as $accum30c) {
+				$close30 = $accum30c->close;
+			}
+			if ($open30 && $close30 && $low30 && $high30) {
+				$ins = \DB::insert("
             INSERT INTO bowhead_ohlc_30m 
             (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`, ctime)
             VALUES
@@ -340,61 +338,61 @@ trait OHLC
             `volume` = VALUES(`volume`),
             `close`  = VALUES(`close`)
         ");
-            }
-        }
+			}
+		}
 
-        /** 1h table update **/
-        $open60 = null;
-        $close60 = null;
-        $high60 = null;
-        $low60 = null;
+		/** 1h table update * */
+		$open60 = null;
+		$close60 = null;
+		$high60 = null;
+		$low60 = null;
 
-        $last60m = \DB::table('bowhead_ohlc_1h')->select(DB::raw('MAX(timeid) AS timeid'))
-            ->where('instrument', $instrument)
-            ->where('timeid', '<', $timeid)
-            ->get();
-        foreach ($last60m as $last60) {
-            $last60timeid = $last60->timeid;
-            $last60timeid = date("YmdHi", strtotime("+59 minutes", strtotime($last60timeid)));
-        }
-        if ($last60timeid < $timeid) {
-            /* Get High and Low from 30m data for insertion */
-            $last60timeids = date("YmdHi", strtotime("-60 minutes", $now));
-            $accum60ma = \DB::table('bowhead_ohlc_30m')->select(DB::raw('MAX(high) as high, MIN(low) as low'))
-                ->where('instrument', $instrument)
-                ->where('timeid', '>=', $last60timeids)
-                ->where('timeid', '<=', ($timeid))
-                ->get();
+		$last60m = \DB::table('bowhead_ohlc_1h')->select(DB::raw('MAX(timeid) AS timeid'))
+				->where('instrument', $instrument)
+				->where('timeid', '<', $timeid)
+				->get();
+		foreach ($last60m as $last60) {
+			$last60timeid = $last60->timeid;
+			$last60timeid = date("YmdHi", strtotime("+59 minutes", strtotime($last60timeid)));
+		}
+		if ($last60timeid < $timeid) {
+			/* Get High and Low from 30m data for insertion */
+			$last60timeids = date("YmdHi", strtotime("-60 minutes", $now));
+			$accum60ma = \DB::table('bowhead_ohlc_30m')->select(DB::raw('MAX(high) as high, MIN(low) as low'))
+					->where('instrument', $instrument)
+					->where('timeid', '>=', $last60timeids)
+					->where('timeid', '<=', ($timeid))
+					->get();
 
-            foreach ($accum60ma as $accum60a) {
-                $high60 = $accum60a->high;
-                $low60 = $accum60a->low;
-            }
+			foreach ($accum60ma as $accum60a) {
+				$high60 = $accum60a->high;
+				$low60 = $accum60a->low;
+			}
 
-            /* Get Open price from 30m data and last 60 minutes */
-            $accum60mb = \DB::table('bowhead_ohlc_30m')->select(DB::raw('*'))
-                ->where('instrument', $instrument)
-                ->where('timeid', '>=', $last60timeids)
-                ->where('timeid', '<=', ($timeid))
-                ->limit(1)
-                ->get();
-            foreach ($accum60mb as $accum60b) {
-                $open60 = $accum60b->open;
-            }
+			/* Get Open price from 30m data and last 60 minutes */
+			$accum60mb = \DB::table('bowhead_ohlc_30m')->select(DB::raw('*'))
+					->where('instrument', $instrument)
+					->where('timeid', '>=', $last60timeids)
+					->where('timeid', '<=', ($timeid))
+					->limit(1)
+					->get();
+			foreach ($accum60mb as $accum60b) {
+				$open60 = $accum60b->open;
+			}
 
-            /* Get Close price from 30m data and last 60 minutes */
-            $accum60mc = \DB::table('bowhead_ohlc_30m')->select(DB::raw('*'))
-                ->where('instrument', $instrument)
-                ->where('timeid', '>=', $last60timeids)
-                ->where('timeid', '<=', ($timeid))
-                ->orderBy('ctime', 'desc')
-                ->limit(1)
-                ->get();
-            foreach ($accum60mc as $accum60c) {
-                $close60 = $accum60c->close;
-            }
-            if ($open60 && $close60 && $low60 && $high60) {
-                $ins = \DB::insert("
+			/* Get Close price from 30m data and last 60 minutes */
+			$accum60mc = \DB::table('bowhead_ohlc_30m')->select(DB::raw('*'))
+					->where('instrument', $instrument)
+					->where('timeid', '>=', $last60timeids)
+					->where('timeid', '<=', ($timeid))
+					->orderBy('ctime', 'desc')
+					->limit(1)
+					->get();
+			foreach ($accum60mc as $accum60c) {
+				$close60 = $accum60c->close;
+			}
+			if ($open60 && $close60 && $low60 && $high60) {
+				$ins = \DB::insert("
             INSERT INTO bowhead_ohlc_1h 
             (`instrument`, `timeid`, `open`, `high`, `low`, `close`, `volume`, ctime)
             VALUES
@@ -405,151 +403,158 @@ trait OHLC
             `volume` = VALUES(`volume`),
             `close`  = VALUES(`close`)
         ");
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * @param $datas
-     *
-     * @return array
-     */
-    public function organizePairData($datas)
-    {
-        $ret['date']   = [];
-        $ret['low']    = [];
-        $ret['high']   = [];
-        $ret['open']   = [];
-        $ret['close']  = [];
-        $ret['volume'] = [];
-
-        $ret = array();
-        foreach ($datas as $data) {
-            $ret['date'][]   = $data->buckettime;
-            $ret['low'][]    = $data->low;
-            $ret['high'][]   = $data->high;
-            $ret['open'][]   = $data->open;
-            $ret['close'][]  = $data->close;
-            $ret['volume'][] = $data->volume;
-        }
-        foreach($ret as $key => $rettemmp) {
-            $ret[$key] = array_reverse($rettemmp);
-        }
-        return $ret;
-    }
-	
-	public function getWinOrLoose ($instrument, $time, $etime, $long, $take, $stop) {
-		$outcome_resultset = \DB::table('bowhead_ohlc_tick')->select(DB::raw('*'))
-                	->where('instrument', $instrument)
-	                ->where('ctime', '>', date('Y-m-d H:i:s', $time))
-	                ->where('ctime', '<', date('Y-m-d H:i:s', $etime))
-	                ->where(function($q) use ($long, $take, $stop) {
-					$q->where('high', '>=', $long ? $take : $stop)
-					  ->orWhere('low', '<=', $long ? $stop : $take);
-				})
-        	        ->orderBy('ctime')
-	                ->limit(1)
-	                ->get();
-            foreach ($outcome_resultset as $outcome) {
-//				print_r(func_get_args());
-//				print_r($outcome);
-                return [
-					'win' => !($long ? $outcome->low < $stop : $outcome->high > $stop),
-					'time' => strtotime($outcome->ctime),
-				];
-            }
-			return [
-				'win' => false,
-				'time' => $etime,
-			];
-	}
-
-    /**
-     * @param string $pair
-     * @param int    $limit
-     * @param bool   $day_data
-     * @param int    $hour
-     * @param string $periodSize
-     * @param bool   $returnRS
-     *
-     * @return array
-     */
-    public function getRecentData($pair='BTC/USD', $limit=168, $day_data=false, $hour=12, $periodSize='1m', $returnRS=false, $current_time=null, $die_on_large_period=TRUE)
-    {
-        /**
-         *  we need to cache this as many strategies will be
-         *  doing identical pulls for signals.
-         */
-        $key = 'recent::'.$pair.'::'.$limit."::$day_data::$hour::$periodSize";
-
-	// TODO improved caching
-	if ($periodSize == '1m') {
-	   $variance = (int)200;
-	} else if ($periodSize == '5m') {
-	   $variance = (int)375;
-	} else if ($periodSize == '15m') {
-	   $variance = (int)1125;
-	} else if ($periodSize == '30m') {
-	   $variance = (int)2250;
-	} else if ($periodSize == '1h') {
-	   $variance = (int)4500;
-	} else if ($periodSize == '1d') {
-	   $variance = (int)108000;
-	}
-
-
-
-	$current_time = $current_time ? $current_time : time();
-        $a = \DB::table('bowhead_ohlc_'.$periodSize)
-            ->select(DB::raw('*, unix_timestamp(ctime) as buckettime'))
-            ->where('instrument', $pair)
-        	->where('timeid', '<=', date('YmdHi', $current_time))
-            ->orderby('timeid', 'DESC')
-            ->limit($limit)
-            ->get();
-	echo  'getRecentData ('.$pair.'): '. date(' Y-m-d H:i:s ', $current_time)."\n";
-
-	$periods = [];
-	$ptime = null;
-	$validperiods = 0;
-
-
-	foreach ($a as $ab) {
-	   $array = (array) $ab;
-	   $array['buckettime'] = strtotime($array['ctime']); // since mysql unix_timestamp attempt was returning timestamps an hour out (maybe due to BST?)
-
-	   $ftime = $array['buckettime'];
-	   if ($ptime == null) {
-		  $ptime = $ftime;
- 		  $periodcheck = $current_time - $ptime;
-		  if($periodcheck > $variance) {
-		      echo "Most recent data is too old... \$periodcheck > \$variance ($periodcheck > $variance) ... \$current_time=$current_time, \$ptime=$ptime, \$variance=$variance)";
-		      $die_on_large_period && die();
-			  return;
-		  }
-		  $periods[] = $periodcheck;
-	   } else {
-		/** Check for missing periods **/
-		#echo 'Past Time is '.$ptime.' and current time is '.$ftime."\n";
-		$periodcheck = $ptime - $ftime;
-		if ((int)$periodcheck > (int)$variance) {
-			echo $periodcheck . ' > ' . $variance.' ' .date('Y-m-d H i s',$ftime) . '  YOU HAVE '.$validperiods.' PERIODS OF VALID PRICE DATA OUT OF '.$limit.'. Please ensure price sync is running and wait for additional data to be logged before trying again. Additionally you could use a smaller time period if available.'."\n";
-			$die_on_large_period && die();
+			}
 		}
-		$periods[] = $periodcheck;
-		$validperiods++;
-	   }
-	   $ptime = $ftime;	
+
+		return true;
 	}
-        if ($returnRS) {
-       	    $ret = $a;
-        } else {
-            $ret = $this->organizePairData($a);
-	    $ret['periods'] = array_reverse($periods);
+
+	/**
+	 * @param $datas
+	 *
+	 * @return array
+	 */
+	public function organizePairData($datas) {
+		$ret['date'] = [];
+		$ret['low'] = [];
+		$ret['high'] = [];
+		$ret['open'] = [];
+		$ret['close'] = [];
+		$ret['volume'] = [];
+
+		$ret = array();
+		foreach ($datas as $data) {
+			$ret['date'][] = $data->buckettime;
+			$ret['low'][] = $data->low;
+			$ret['high'][] = $data->high;
+			$ret['open'][] = $data->open;
+			$ret['close'][] = $data->close;
+			$ret['volume'][] = $data->volume;
+		}
+		foreach ($ret as $key => $rettemmp) {
+			$ret[$key] = array_reverse($rettemmp);
+		}
+		return $ret;
 	}
-        //todo: \Cache::put($key, $ret, 2);
-        return $ret;
-    }
+
+	public function getWinOrLoose($instrument, $time, $etime, $long, $take, $stop, $entry = NULL, $leverage = 1, $spread = 0) {
+		// if I understand this right, we lose ~ half spread on entry (due to cost to buy/sell) .. effectively offsetting our entry position
+		// The take and stop loss values used to calc the profit are not adjusted, instead the TP or SL won't trigger until we hit actual price +/- remaining spread adjustment
+		$adjusted_entry = $long ? ($entry / 100) * (100 + ($spread / 2)) : ($entry / 100) * (100 - ($spread / 2));
+		$adjusted_take = $long ? ($take / 100) * (100 + ($spread / 2)) : ($take / 100) * (100 - ($spread / 2));
+		$adjusted_stop = $long ? ($stop / 100) * (100 - ($spread / 2)) : ($stop / 100) * (100 + ($spread / 2));
+		$outcome_resultset = \DB::table('bowhead_ohlc_tick')->select(DB::raw('*'))
+				->where('instrument', $instrument)
+				->where('ctime', '>', date('Y-m-d H:i:s', $time))
+				->where('ctime', '<', date('Y-m-d H:i:s', $etime))
+				->where(function($q) use ($long, $adjusted_take, $adjusted_stop) {
+					$q->where('high', '>=', $long ? $adjusted_take : $adjusted_stop)
+					->orWhere('low', '<=', $long ? $adjusted_stop : $adjusted_take);
+				})
+				->orderBy('ctime')
+				->limit(1)
+				->get();
+		foreach ($outcome_resultset as $outcome) {
+			$profit_percentage = $leverage * (((($result['win'] ? abs($take - $adjusted_entry) : -abs($stop - $adjusted_entry)) / $adjusted_entry) * 100));
+
+			return [
+				'win' => !($long ? $outcome->low < $adjusted_stop : $outcome->high > $adjusted_stop),
+				'time' => strtotime($outcome->ctime),
+				'percentage_profit' => $profit_percentage,
+			];
+		}
+
+		return [
+			'win' => false,
+			'time' => $etime,
+			'percentage_profit' => -$leverage * (abs($stop - $adjusted_entry) / $adjusted_entry) * 100,
+		];
+	}
+
+	/**
+	 * @param string $pair
+	 * @param int    $limit
+	 * @param bool   $day_data
+	 * @param int    $hour
+	 * @param string $periodSize
+	 * @param bool   $returnRS
+	 *
+	 * @return array
+	 */
+	public function getRecentData($pair = 'BTC/USD', $limit = 168, $day_data = false, $hour = 12, $periodSize = '1m', $returnRS = false, $current_time = null, $die_on_large_period = TRUE) {
+		/**
+		 *  we need to cache this as many strategies will be
+		 *  doing identical pulls for signals.
+		 */
+		$key = 'recent::' . $pair . '::' . $limit . "::$day_data::$hour::$periodSize";
+
+		// TODO improved caching
+		if ($periodSize == '1m') {
+			$variance = (int) 200;
+		} else if ($periodSize == '5m') {
+			$variance = (int) 375;
+		} else if ($periodSize == '15m') {
+			$variance = (int) 1125;
+		} else if ($periodSize == '30m') {
+			$variance = (int) 2250;
+		} else if ($periodSize == '1h') {
+			$variance = (int) 4500;
+		} else if ($periodSize == '1d') {
+			$variance = (int) 108000;
+		}
+
+
+
+		$current_time = $current_time ? $current_time : time();
+		$a = \DB::table('bowhead_ohlc_' . $periodSize)
+				->select(DB::raw('*, unix_timestamp(ctime) as buckettime'))
+				->where('instrument', $pair)
+				->where('timeid', '<=', date('YmdHi', $current_time))
+				->orderby('timeid', 'DESC')
+				->limit($limit)
+				->get();
+		echo 'getRecentData (' . $pair . '): ' . date(' Y-m-d H:i:s ', $current_time) . "\n";
+
+		$periods = [];
+		$ptime = null;
+		$validperiods = 0;
+
+
+		foreach ($a as $ab) {
+			$array = (array) $ab;
+			$array['buckettime'] = strtotime($array['ctime']); // since mysql unix_timestamp attempt was returning timestamps an hour out (maybe due to BST?)
+
+			$ftime = $array['buckettime'];
+			if ($ptime == null) {
+				$ptime = $ftime;
+				$periodcheck = $current_time - $ptime;
+				if ($periodcheck > $variance) {
+					echo "Most recent data is too old... \$periodcheck > \$variance ($periodcheck > $variance) ... \$current_time=$current_time, \$ptime=$ptime, \$variance=$variance)";
+					$die_on_large_period && die();
+					return;
+				}
+				$periods[] = $periodcheck;
+			} else {
+				/** Check for missing periods * */
+				#echo 'Past Time is '.$ptime.' and current time is '.$ftime."\n";
+				$periodcheck = $ptime - $ftime;
+				if ((int) $periodcheck > (int) $variance) {
+					echo $periodcheck . ' > ' . $variance . ' ' . date('Y-m-d H i s', $ftime) . '  YOU HAVE ' . $validperiods . ' PERIODS OF VALID PRICE DATA OUT OF ' . $limit . '. Please ensure price sync is running and wait for additional data to be logged before trying again. Additionally you could use a smaller time period if available.' . "\n";
+					$die_on_large_period && die();
+				}
+				$periods[] = $periodcheck;
+				$validperiods++;
+			}
+			$ptime = $ftime;
+		}
+		if ($returnRS) {
+			$ret = $a;
+		} else {
+			$ret = $this->organizePairData($a);
+			$ret['periods'] = array_reverse($periods);
+		}
+		//todo: \Cache::put($key, $ret, 2);
+		return $ret;
+	}
+
 }
