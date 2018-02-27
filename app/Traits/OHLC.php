@@ -440,7 +440,7 @@ trait OHLC {
 	public function getWinOrLoose($instrument, $time, $etime, $long, $take, $stop, $entry = NULL, $leverage = 1, $spread = 0) {
 		// if I understand this right, we lose ~ half spread on entry (due to cost to buy/sell) .. effectively offsetting our entry position
 		// The take and stop loss values used to calc the profit are not adjusted, instead the TP or SL won't trigger until we hit actual price +/- remaining spread adjustment
-		$adjusted_entry = $long ? ($entry / 100) * (100 + ($spread / 2)) : ($entry / 100) * (100 - ($spread / 2));
+		$adjusted_entry = $entry ? ($long ? ($entry / 100) * (100 + ($spread / 2)) : ($entry / 100) * (100 - ($spread / 2))) : NULL;
 		$adjusted_take = $long ? ($take / 100) * (100 + ($spread / 2)) : ($take / 100) * (100 - ($spread / 2));
 		$adjusted_stop = $long ? ($stop / 100) * (100 - ($spread / 2)) : ($stop / 100) * (100 + ($spread / 2));
 		$outcome_resultset = \DB::table('bowhead_ohlc_tick')->select(DB::raw('*'))
@@ -455,10 +455,11 @@ trait OHLC {
 				->limit(1)
 				->get();
 		foreach ($outcome_resultset as $outcome) {
-			$profit_percentage = $leverage * (((($result['win'] ? abs($take - $adjusted_entry) : -abs($stop - $adjusted_entry)) / $adjusted_entry) * 100));
+			$win = !($long ? $outcome->low < $adjusted_stop : $outcome->high > $adjusted_stop);
+			$profit_percentage = empty($adjusted_entry) ? NULL : $leverage * (((($win ? abs($take - $adjusted_entry) : -abs($stop - $adjusted_entry)) / $adjusted_entry) * 100));
 
 			return [
-				'win' => !($long ? $outcome->low < $adjusted_stop : $outcome->high > $adjusted_stop),
+				'win' => $win,
 				'time' => strtotime($outcome->ctime),
 				'percentage_profit' => $profit_percentage,
 			];
@@ -467,7 +468,7 @@ trait OHLC {
 		return [
 			'win' => false,
 			'time' => $etime,
-			'percentage_profit' => -$leverage * (abs($stop - $adjusted_entry) / $adjusted_entry) * 100,
+			'percentage_profit' => empty($adjusted_entry) ? NULL : -$leverage * (abs($stop - $adjusted_entry) / $adjusted_entry) * 100,
 		];
 	}
 

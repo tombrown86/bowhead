@@ -71,7 +71,7 @@ class EvaluateStrategiesCommand extends Command {
 		$instrument = 'EUR/USD';
 		$interval = '1m';
 		$skip_weekends = FALSE;
-		$results_filename = 'eurusd_QUAD_MANY_IND_COMBINATIONs_and_several_BOUNDS_any_candle_1and5mand15m_Intervals';
+		$results_filename = 'eurusd_QUAN+ALL_SEEN)IND_COMBINATIONs_and_several_BOUNDS_any_candle_all_Intervals';
 		$results_obj_filename = $results_filename . '_RESULTS_OBJ';
 
 		$strategy_open_position = [];
@@ -95,7 +95,7 @@ class EvaluateStrategiesCommand extends Command {
 //		$results = json_decode(file_get_contents($results_obj_filename));
 		$results = [];
 		$end_min = strtotime('2017-12-10 05:00:00');
-		$start_min = strtotime('2016-01-01 05:00:00');
+		$start_min = strtotime('2016-12-10 05:00:00');
 		$spread = '0.01';
 		$leverage = 222;
 
