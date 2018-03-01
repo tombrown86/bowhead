@@ -19,15 +19,15 @@ use Bowhead\Models;
  * Class ExampleCommand
  * @package Bowhead\Console\Commands
  */
-ini_set('memory_limit', '1G');
+ini_set('memory_limit', '2G');
 
 class EvaluateStrategiesCommand extends Command {
 
 	use Signals,
-	 Strategies,
-	 CandleMap,
-	 OHLC,
-	 Pivots; // add our traits
+     Strategies,
+     CandleMap,
+     OHLC,
+     Pivots; // add our traits
 
 	/**
 	 * The console command name.
@@ -101,7 +101,7 @@ class EvaluateStrategiesCommand extends Command {
 
 		for ($min = $start_min; $min <= $end_min; $min += 60) {
 			if ($skip_weekends &&
-					(in_array(date('w', $min), [0, 6]) || in_array(date('w', $min + 7200), [0, 6]))) { // continue if weekend now or in under 2 hours 
+				(in_array(date('w', $min), [0, 6]) || in_array(date('w', $min + 7200), [0, 6]))) { // continue if weekend now or in under 2 hours 
 				continue;
 			}
 
@@ -189,25 +189,24 @@ class EvaluateStrategiesCommand extends Command {
 				$indicator_results = $ind->allSignals('EUR/USD', $data);
 
 //				foreach($trends[$instrument] as $trend_name=>$trend_value) { if($trend_value != 0) {
-
 				// as we go, add specific combinations 
 				$overbought_indicators = $underbought_indicators = [];
-				foreach($indicator_results as $indicator=>$value) { 
-					if($value > 0) {
+				foreach ($indicator_results as $indicator => $value) {
+					if ($value > 0) {
 						$underbought_indicators[] = $indicator;
 					}
-					if($value < 0) {
+					if ($value < 0) {
 						$overbought_indicators[] = $indicator;
 					}
-					if(count($overbought_indicators) > 4) {
+					if (count($overbought_indicators) > 4) {
 						sort($overbought_indicators);
-						if(!in_array($overbought_indicators, $indicator_combinations)) {
+						if (!in_array($overbought_indicators, $indicator_combinations)) {
 							$indicator_combinations[] = $overbought_indicators;
 						}
 					}
-					if(count($underbought_indicators) > 4) {
+					if (count($underbought_indicators) > 4) {
 						sort($underbought_indicators);
-						if(!in_array($underbought_indicators, $indicator_combinations)) {
+						if (!in_array($underbought_indicators, $indicator_combinations)) {
 							$indicator_combinations[] = $underbought_indicators;
 						}
 					}
@@ -235,49 +234,54 @@ class EvaluateStrategiesCommand extends Command {
 						$indicators_underbought = $indicators_underbought && $indicator_results[$indicator] > 0;
 					}
 					if (($indicators_overbought XOR $indicators_underbought) && isset($candles['current'])) { // check for at least 1 candle
+						$candle_count = 0;
 						foreach ($candles['current'] as $candle_name => $candle_value) {
 							$underbought = $overbought = 0;
 							if ($candle_value > 0 && $indicators_underbought) {
 								$underbought = 1;
+								$candle_count++;
 							} else if ($candle_value < 0 && $indicators_overbought) {
 								$overbought = 1;
+								$candle_count++;
 							}
+						}
 
-							if ($overbought XOR $underbought) {
-								foreach (['demark', 'fib_r2s2', 'fib_r3s3', 'perc_20_20', 'perc_30_40', 'perc_40_40'/* 'perc_10_20' */] as $bounds_method) {
-									if ($interval != '1m' && $interval != '5m' && $bounds_method == 'demark') {
-										// demark algoritm fails with long intervals!  apparently it's no good for them anyway, so skipping rather than trying to resolve it
-										continue;
+						if ($overbought XOR $underbought) {
+							foreach (['demark', 'fib_r2s2', 'fib_r3s3', 'perc_20_20', 'perc_30_40', 'perc_40_40'/* 'perc_10_20' */] as $bounds_method) {
+								if ($interval != '1m' && $interval != '5m' && $bounds_method == 'demark') {
+									// demark algoritm fails with long intervals!  apparently it's no good for them anyway, so skipping rather than trying to resolve it
+									continue;
+								}
+								$bounds_strategy_name = "$bounds_method $strategy_name";
+								if ($overbought) {
+									$long = FALSE;
+								} else if ($underbought) {
+									$long = TRUE;
+								}
+
+								$endmin = $min + (2 * 60 * 60);
+								list($stop, $take) = $this->get_bounds($bounds_method, $data, $long, $current_price, $leverage);
+
+								if ($long) {
+									if (!isset($win_or_lose_long[$bounds_method])) {
+										$win_or_lose_long[$bounds_method] = $this->getWinOrLoose('EUR/USD', $min, $endmin, TRUE, $take, $stop, $current_price, $leverage, $spread);
 									}
-									$bounds_strategy_name = "$bounds_method $strategy_name";
-									if ($overbought) {
-										$long = FALSE;
-									} else if ($underbought) {
-										$long = TRUE;
+									$result = $win_or_lose_long[$bounds_method];
+								} else {
+									if (!isset($win_or_lose_short[$bounds_method])) {
+										$win_or_lose_short[$bounds_method] = $this->getWinOrLoose('EUR/USD', $min, $endmin, FALSE, $take, $stop, $current_price, $leverage, $spread);
 									}
+									$result = $win_or_lose_short[$bounds_method];
+								}
 
-									$endmin = $min + (2 * 60 * 60);
-									list($stop, $take) = $this->get_bounds($bounds_method, $data, $long, $current_price, $leverage);
-
-									if ($long) {
-										if (!isset($win_or_lose_long[$bounds_method])) {
-											$win_or_lose_long[$bounds_method] = $this->getWinOrLoose('EUR/USD', $min, $endmin, TRUE, $take, $stop, $current_price, $leverage, $spread);
-										}
-										$result = $win_or_lose_long[$bounds_method];
-									} else {
-										if (!isset($win_or_lose_short[$bounds_method])) {
-											$win_or_lose_short[$bounds_method] = $this->getWinOrLoose('EUR/USD', $min, $endmin, FALSE, $take, $stop, $current_price, $leverage, $spread);
-										}
-										$result = $win_or_lose_short[$bounds_method];
-									}
-
-									// keep note of end time for this trade.
-									$strategy_open_position[$bounds_strategy_name] = $result['time'];
-
-									foreach ([$bounds_strategy_name, 'all'] as $bounds_strategy_name) {
+								// keep note of end time for this trade.
+								$strategy_open_position[$bounds_strategy_name] = $result['time'];
+								
+								foreach ([$bounds_strategy_name, 'all'] as $bounds_strategy_name) {
+									for ($current_candle_count = 1; $current_candle_count <= $candle_count; $current_candle_count++) { // create row for cand
 										if (!isset($results[$bounds_strategy_name])) {
 											$results[$bounds_strategy_name] = [
-												'strategy_name' => 'IC+1cand__' . implode('_', $indicators),
+												'strategy_name' => 'x_candles__and__' . implode('_', $indicators),
 												'bounds_strategy_name' => $bounds_method,
 												'indicator_count' => count($indicators),
 												'long_wins' => 0,
@@ -295,26 +299,27 @@ class EvaluateStrategiesCommand extends Command {
 												'avg_long_profit' => 0,
 												'avg_short_profit' => 0,
 												'avg_profit' => 0,
-													/* these will be created as necessary
-													  'long_correct_candle' => [],
-													  'long_correct_inverse_candle' => [],
-													  'long_wrong_candle' => [],
-													  'long_wrong_inverse_candle' => [],
-													  'short_correct_candle' => [],
-													  'short_correct_inverse_candle' => [],
-													  'short_wrong_candle' => [],
-													  'short_wrong_inverse_candle' => [],
+												'candle_count' => $current_candle_count,
+												/* these will be created as necessary
+												  'long_correct_candle' => [],
+												  'long_correct_inverse_candle' => [],
+												  'long_wrong_candle' => [],
+												  'long_wrong_inverse_candle' => [],
+												  'short_correct_candle' => [],
+												  'short_correct_inverse_candle' => [],
+												  'short_wrong_candle' => [],
+												  'short_wrong_inverse_candle' => [],
 
-													  'long_correct_trend' => [],
-													  'long_correct_inverse_trend' => [],
-													  'long_wrong_trend' => [],
-													  'long_wrong_inverse_trend' => [],
-													  'short_correct_trend' => [],
-													  'short_correct_inverse_trend' => [],
-													  'short_wrong_trend' => [],
-													  'short_wrong_inverse_trend' => [],
+												  'long_correct_trend' => [],
+												  'long_correct_inverse_trend' => [],
+												  'long_wrong_trend' => [],
+												  'long_wrong_inverse_trend' => [],
+												  'short_correct_trend' => [],
+												  'short_correct_inverse_trend' => [],
+												  'short_wrong_trend' => [],
+												  'short_wrong_inverse_trend' => [],
 
-													  '% WIN' => 0, */
+												  '% WIN' => 0, */
 											];
 										}
 
@@ -457,6 +462,7 @@ class EvaluateStrategiesCommand extends Command {
 						, 'shorts_per_day' => (float) @$result['total_shorts'] * $days_of_data
 						, 'indicator_count' => (int) @$result['indicator_count']
 						, 'test_confirmations' => (int) @$result['positions_count']
+						, 'candle_count' => @$result['candle_count']
 					];
 //					print_r($data);die;
 					$terry_strategy_knowledge::updateOrCreate($unique_fields, $data);

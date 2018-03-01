@@ -1153,17 +1153,17 @@ trait Strategies
 
 	function check_terry_knowledge($pair, $indicators, $candles, $interval='1m') {
 		// find any candle first
-		$long_candle = $short_candle = FALSE;
+		$long_candle_count = $short_candle_count = 0;
 		if (isset($candles['current'])) {
 			foreach ($candles['current'] as $candle_value) {
 				if ($candle_value > 0) {
-					$long_candle = TRUE;
+					$long_candle_count++;
 				} else if ($candle_value < 0) {
-					$short_candle = TRUE;
+					$short_candle_count++;
 				}
 			}
 		}
-		if ($long_candle || $short_candle) {
+		if ($long_candle_count || $short_candle_count) {
 			$long_indicators = $short_indicators = [];
 			foreach($indicators as $indicator_name => $indicator_value) {
 				if($indicator_value > 0) {
@@ -1184,7 +1184,7 @@ trait Strategies
 					$quadruples = [];
 					$this->combinations($indicators, 4, $quadruples);
 					$indicator_combinations = array_merge($doubles, $triples, $quadruples);
-					$indicator_combinations = array_walk($indicator_combinations, function($indicators) {return 'IC+1cand__'.implode('_', $indicators);});
+					$indicator_combinations = array_walk($indicator_combinations, function($indicators) {return 'x_candles__and___'.implode('_', $indicators);});
 
 					$knowledge = \DB::table('terry_strategy_knowledge')
 						->select(DB::raw('*'))
@@ -1192,7 +1192,8 @@ trait Strategies
 						->where('percentage_'.$los.'_win', '>', 70) // filter out incomplete results
 						->where('test_confirmations', '>', 5)
 						->where('strategy_name', 'IN', $indicator_combinations) 
-						->order('avg_'.$los.'_profit')
+						->where('candle_count', '<=', ${$los.'_candle_count'})
+						->order('avg_'.$los.'_profit, candle_count desc')
 						->get();
 					if(count($knowledge)) {
 						return ['signal' => $los, 'bounds_method'=>$knowledge[0]['bounds_strategy_name'], 'long_matches' => $long_matches];

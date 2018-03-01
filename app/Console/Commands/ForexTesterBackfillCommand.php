@@ -8,7 +8,7 @@ use Bowhead\Util;
 use Bowhead\Traits\OHLC;
 
 
-ini_set('memory_limit','2G');
+
 
 class ForexTesterBackfillCommand extends Command {
 
@@ -58,6 +58,7 @@ class ForexTesterBackfillCommand extends Command {
 	}
 
 	public function handle() {
+		ini_set('memory_limit','2G');
 		$this->console = $util = new Console();
 		// data from :  http://www.forexrate.co.uk/forexhistoricaldata.php
 
@@ -95,6 +96,8 @@ class ForexTesterBackfillCommand extends Command {
 							$data[strtotime($date_str)][] = [$matches[3], trim($matches[4])];
 						}// just skip lines which don't match... (empty lines or heading line?)
 					}
+					fclose($handle);
+					
 					foreach($data as $time=>$bas) {
 						$h = $c = 0;
 						$l = 99999999;
