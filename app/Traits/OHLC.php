@@ -456,12 +456,12 @@ trait OHLC {
 				->get();
 		foreach ($outcome_resultset as $outcome) {
 			$win = !($long ? $outcome->low < $adjusted_stop : $outcome->high > $adjusted_stop);
-			$profit_percentage = empty($adjusted_entry) ? NULL : $leverage * (((($win ? abs($take - $adjusted_entry) : -abs($stop - $adjusted_entry)) / $adjusted_entry) * 100));
+			$percentage_profit = empty($adjusted_entry) ? NULL : $leverage * (((($win ? abs($take - $adjusted_entry) : -abs($stop - $adjusted_entry)) / $adjusted_entry) * 100));
 
 			return [
 				'win' => $win,
 				'time' => strtotime($outcome->ctime),
-				'percentage_profit' => $profit_percentage,
+				'percentage_profit' => $percentage_profit,
 			];
 		}
 
@@ -520,19 +520,19 @@ trait OHLC {
 		$ptime = null;
 		$validperiods = 0;
 
-
 		foreach ($a as $ab) {
 			$array = (array) $ab;
 			$array['buckettime'] = strtotime($array['ctime']); // since mysql unix_timestamp attempt was returning timestamps an hour out (maybe due to BST?)
 
 			$ftime = $array['buckettime'];
+//			echo date('Y-m-d H:i:s', $current_time)."\n";
+//			echo date('Y-m-d H:i:s', $ftime)."\n\n";
 			if ($ptime == null) {
 				$ptime = $ftime;
 				$periodcheck = $current_time - $ptime;
 				if ($periodcheck > $variance) {
 					echo "Most recent data is too old... \$periodcheck > \$variance ($periodcheck > $variance) ... \$current_time=$current_time, \$ptime=$ptime, \$variance=$variance)";
 					$die_on_large_period && die();
-					return;
 				}
 				$periods[] = $periodcheck;
 			} else {

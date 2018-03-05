@@ -81,8 +81,8 @@ class ForexTesterBackfillCommand extends Command {
 
 		for($year = 2015; $year < 2019; $year++) {
 			for($week = 1; $week < 54; $week++) {
-				if($year == 2015 && $week < 33) {continue;}//2015-08-21 20:01:00
-				$path = '/home/terry/forexdata/fxcm/csv/'.$year.'_'.$week.'.csv';
+//				if($year == 2015 || ($year == 2016 && $week < 20)) {continue;}//2015-08-21 20:01:00
+				$path = '/home/tom/forexdata/fxcm/csv/'.$year.'_'.$week.'.csv';
 				if(!file_exists($path)) {
 					echo "File does not exist ($path).. just skipping..";
 				} else {

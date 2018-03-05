@@ -19,7 +19,7 @@ use AndreasGlaser\PPC\PPC; // https://github.com/andreas-glaser/poloniex-php-cli
  * @package Bowhead\Console\Commands
  */
 
-class EvaluateStrategiesCommand extends Command {
+class EvaluateStrategiesCountCommand extends Command {
 
 	use Signals,
 	 Strategies,
@@ -32,7 +32,7 @@ class EvaluateStrategiesCommand extends Command {
 	 *
 	 * @var string
 	 */
-	protected $name = 'bowhead:eval_strategies';
+	protected $name = 'bowhead:eval_strategies_count';
 	protected $description = '';
 	protected $order_cooloff;
 
