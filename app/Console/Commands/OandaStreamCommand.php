@@ -62,29 +62,22 @@ class OandaStreamCommand extends Command
                 return null;
             }
 
-            $pipeB = fopen("quotes",'r');
-            $line = fgets($pipeB);
-            $results = json_decode($line);
-
-            if (empty($results)) {
-              continue;
-            }
-
-//            foreach ($results as $result) {
-//				  print_r($results);die;
-//              if (is_array($result)) {
-//                foreach ($result as $price) {
-				  $price = $results;
+            $quotes = file_get_contents("quotes");
+	   file_put_contents("quotes", "");
+	   foreach(explode("\n", $quotes) as $results) { 
+                  if (empty($results)) {
+                      continue;
+ 	          }
+                  $price = json_decode($results);
                   $ticker = [];
-				  
+
                   $ticker['tick']['bid'] = round(((float) $price->bids[0]->price + (float) $price->asks[0]->price) / 2, 5);
                   $ticker['tick']['instrument'] = str_replace('-', '/', $price->instrument);
                   $this->markOHLC($ticker);
+		  print_r($ticker);
                   $ins = $ticker['tick']['instrument'];
                   $curr[$ins] = (($price->bids[0]->price + $price->asks[0]->price)/2);
-//                }
-//              }
-//            }
+	}
 
             $output = [];
             foreach ($curr as $instrument => $bid) {

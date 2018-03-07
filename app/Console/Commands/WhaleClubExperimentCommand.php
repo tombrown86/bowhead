@@ -121,10 +121,70 @@ class WhaleClubExperimentCommand extends Command {
 				echo "QUIT detected...";
 				return null;
 			}
+
+
+			$skip_weekends = TRUE;
+
 			echo "\n";
-			foreach (['5m', '1m'] as $interval) {
+			foreach (['1m', '5m', '15m', '30m', '1h']  as $interval) {
 				foreach ($instruments as $instrument) {
-					$data = $this->getRecentData($instrument, 200, $interval);
+					$secs_since_market_open = $min - strtotime(date('Y-m-d 22:00:00', date('w', $min)=="0" ? strtotime('today', $min) : strtotime('last Sunday', time()));
+
+					// if skipping weekends, get max num of periods since end of weekend
+
+					if ($interval == '1m') {
+						$max_period = 300;
+						$periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / 60), 365) : 365;
+
+						if ($periods_to_get < 300) { // make sure there is a long enough range
+							continue;
+						}
+					}
+					if ($interval == '5m') {
+						$periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / (60 * 5)), 365) : 365;
+						$max_period = 60 * 7;
+
+						if ($min % (60*5) || $periods_to_get < 200) { // make sure there is a long enough range
+							continue;
+						}
+					}
+					if ($interval == '15m') {
+						$periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / (60 * 15)), 365) : 365;
+						$max_period = 60 * 17;
+
+						if ($min % (60*15) || $periods_to_get < 70) { // make sure there is a long enough range
+							continue;
+						}
+					}
+					if ($interval == '30m') {
+						$periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / (60 * 30)), 365) : 365;
+						$max_period = 60 * 31;
+
+						if ($min % (60*30) || $periods_to_get < 50) { // make sure there is a long enough range
+							continue;
+						}
+					}
+					if ($interval == '1h') {
+						$periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / (60 * 60)), 365) : 365;
+						$max_period = 60 * 62;
+
+						if ($min % 3600 || $periods_to_get < 40) { // make sure there is a long enough range
+							continue;
+						}
+					}
+
+					$data = $this->getRecentData($instrument, $periods_to_get, false, date('H'), $interval, false, time(), false);
+	                                if (count($data['periods']) < $periods_to_get) {
+	                                        $skipped ++;
+	                                        echo "\n !!!!!!!!!!!!!!! Less than $periods_to_get periods returned ($min) for $interval! \n";
+	                                        continue;
+	                                }
+	                                if (max($data['periods']) > $max_period) {
+                                	        $skipped ++;
+                        	                echo "\n !!!!!!!!!!!!!!! Skipping, max period was " . max($data['periods']) . "! ($min) for $interval \n";
+                	                        file_put_contents('/tmp/periodcheck_wc', "\n !!!!!!!!!!!!!!! Skipping, max period was " . max($data['periods']) . "! ($min) for $interval \n", FILE_APPEND);
+        	                                continue;
+	                                }
 
 					$candles = $cand->allCandles($instrument, $data);
 					$indicators = $ind->allSignals($instrument, $data);
@@ -133,7 +193,7 @@ class WhaleClubExperimentCommand extends Command {
 					$result = $this->check_terry_knowledge($instrument, $indicators, $candles, $interval);
 
 					$direction = 0;
-					if ($resfterrult['signal'] == 'long') {
+					if ($result['signal'] == 'long') {
 						$direction = 1;
 						echo "\n-$instrument ($interval): Found long signal... " . print_r($result, 1);
 					} elseif ($result['signal'] == 'short') {

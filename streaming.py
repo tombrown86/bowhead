@@ -38,7 +38,7 @@ def connect_to_stream():
     domain = domainDict[environment]
     access_token = "fd34a3e27890401e471e4f98cb75ffad-0c392634e549444f1838a0d241d1e5dc"
     account_id = "101-004-7388733-001"
-    instruments = 'USD_JPY,EUR_USD,AUD_USD,EUR_GBP,USD_CAD,USD_CHF,USD_MXN,USD_TRY,USD_CNH,NZD_USD'
+    instruments = 'EUR_USD,EUR_GBP,GBP_JPY,GBP_USD'
 
     try:
         s = requests.Session()
@@ -72,10 +72,11 @@ def demo(displayHeartbeat):
             except Exception as e:
                 print("Caught exception when converting message into json\n" + str(e))
                 return
-            
+
             if (msg['type'] == "PRICE") or displayHeartbeat:
-                fifo=open('quotes','a')
-                fifo.write(line + "\n")
+                f=open('quotes','a+')
+                f.write(line + "\n")
+		f.close()
 
 def main():
     usage = "usage: %prog [options]"

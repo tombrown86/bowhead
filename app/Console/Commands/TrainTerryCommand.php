@@ -129,7 +129,7 @@ class TrainTerryCommand extends Command {
 				}
 				if ($interval == '5m') {
 					$periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / (60 * 5)), 365) : 365;
-					$max_period = 60 * 6;
+					$max_period = 60 * 7;
 
 					if ($min % (60*5) || $periods_to_get < 200) { // make sure there is a long enough range
 						continue;
@@ -137,7 +137,7 @@ class TrainTerryCommand extends Command {
 				}
 				if ($interval == '15m') {
 					$periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / (60 * 15)), 365) : 365;
-					$max_period = 60 * 16;
+					$max_period = 60 * 17;
 
 					if ($min % (60*15) || $periods_to_get < 70) { // make sure there is a long enough range
 						continue;
@@ -153,7 +153,7 @@ class TrainTerryCommand extends Command {
 				}
 				if ($interval == '1h') {
 					$periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / (60 * 60)), 365) : 365;
-					$max_period = 60 * 61;
+					$max_period = 60 * 62;
 
 					if ($min % 3600 || $periods_to_get < 40) { // make sure there is a long enough range
 						continue;
@@ -444,7 +444,7 @@ class TrainTerryCommand extends Command {
 				foreach ($results as $result) {
 
 					$days_of_data = ($min - $start_min) / 60 * 60 * 24;
-//					print_r($result);
+					print_r($result);
 					$unique_fields = [
 						'strategy_name' => $result['strategy_name']
 						, 'bounds_strategy_name' => $result['bounds_strategy_name']

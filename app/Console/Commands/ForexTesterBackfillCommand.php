@@ -58,7 +58,7 @@ class ForexTesterBackfillCommand extends Command {
 	}
 
 	public function handle() {
-		ini_set('memory_limit','2G');
+		ini_set('memory_limit','4G');
 		$this->console = $util = new Console();
 		// data from :  http://www.forexrate.co.uk/forexhistoricaldata.php
 
@@ -81,7 +81,6 @@ class ForexTesterBackfillCommand extends Command {
 
 		for($year = 2015; $year < 2019; $year++) {
 			for($week = 1; $week < 54; $week++) {
-//				if($year == 2015 || ($year == 2016 && $week < 20)) {continue;}//2015-08-21 20:01:00
 				$path = '/home/tom/forexdata/fxcm/csv/'.$year.'_'.$week.'.csv';
 				if(!file_exists($path)) {
 					echo "File does not exist ($path).. just skipping..";
@@ -122,7 +121,7 @@ class ForexTesterBackfillCommand extends Command {
 								, 'volume2' => 0
 							];
 	//						print_r($row);die;
-							$this->markOHLC($row, 'raw', 'EUR/USD');
+							$this->markOHLC($row, 'raw', 'GBP/JPY');
 					}
 				}
 			}
