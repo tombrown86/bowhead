@@ -1153,18 +1153,9 @@ trait Strategies
 	}
 
 	function check_terry_knowledge($pair, $indicators, $candles, $interval='1m') {
-		// find any candle first
-		$long_candle_count = $short_candle_count = 0;
-		if (isset($candles['current'])) {
-			foreach ($candles['current'] as $candle_value) {
-				if ($candle_value > 0) {
-					$long_candle_count++;
-				} else if ($candle_value < 0) {
-					$short_candle_count++;
-				}
-			}
-		}
-		if ($long_candle_count || $short_candle_count) {
+                $candle_strengths = CandleMap::get_candle_strengths($candles);
+
+		if ($candle_strengths['short'] > 0 || $candle_strengths['long'] > 0) {
 			$long_indicators = $short_indicators = [];
 			foreach($indicators as $indicator_name => $indicator_value) {
 				if($indicator_value > 0) {
@@ -1176,7 +1167,7 @@ trait Strategies
 			}
 			foreach(['long', 'short'] as $los) {
 				$indicators = ${$los.'_indicators'};
-				if(count($indicators)) {
+				if(count($indicators) && $candle_strengths[$los] > 0) {
 					sort($indicators);
 					$doubles = [];
 					$this->combinations($indicators, 2, $doubles);
@@ -1189,20 +1180,21 @@ trait Strategies
 					(count($indicators) > 4) && $indicator_combinations[] = $indicators; // add full list, for potential exact match
 					$indicator_combinations = array_walk($indicator_combinations, function($indicators) {return 'x_candles__and___'.implode('_', $indicators);});
 
-					$candle_strength = Strategies::get_candle_strength_from_count(${$los.'_candle_count'});
-
 					$knowledge = DB::table('terry_strategy_knowledge')
 						->select(DB::raw('*'))
 						->where('instrument', $pair)
-						->where('percentage_'.$los.'_win', '>', 70) // filter out incomplete results
-						->where('test_confirmations', '>', 5)
+						->where('interval', $interval)
+						->where('percentage_'.$los.'_win', '>', 70) // successful strats only
+						->where('test_confirmations', '>', 5) // with enough confirmations to be a valuable stat
 						->where('strategy_name', 'IN', $indicator_combinations) 
-						->where('candle_strength', '<=', $candle_strength)
+						->where('candle_strength', '<=', $candle_strengths[$los])
 						->orderBy('indicator_count', 'desc')
 						->orderBy('avg_'.$los.'_profit', 'desc')
-						->orderBy('candle_strength', 'desc') // take those with most indicator matches first
-						->get();
-					
+						->orderBy('candle_strength', 'desc'); // take those with most indicator matches first
+
+					echo $knowledge->toSql();
+					$knowledge = $knowledge->get();
+
 					if(count($knowledge)) {
 						return ['signal' => $los, 'bounds_method'=>$knowledge[0]['bounds_strategy_name'], 'long_matches' => $long_matches];
 					}
@@ -1257,16 +1249,44 @@ trait Strategies
 		}
 	}
 
-	static function get_candle_strength_from_count($count) {
-		if($count > 7) {
-			return 4;
-		} else if($count > 3) {
-			return 3;
-		} else if($count > 1) {
-			return 2;
-		} else if($count == 1) {
-			return 1;
-		}
-		return 0;
+
+	static function get_rules_for_interval($interval, $secs_since_market_open=PHP_INT_MAX) {
+                               if ($interval == '1m') {
+                                       $periods_to_get = min(floor($secs_since_market_open / 60) - 50, 365);
+                                       $max_period = 60 * 6;
+                                       $max_avg_period = 75;
+                                       $interval_secs = 60;
+                                       $min_periods = 300;
+                               }
+                               if ($interval == '5m') {
+                                       $periods_to_get = min(floor($secs_since_market_open / (60 * 5)) - 25, 365);
+                                       $max_period = 60 * 25;
+                                       $max_avg_period = 60 * 8;
+                                       $interval_secs = 5 * 60;
+                                       $min_periods = 120;
+                               }
+                               if ($interval == '15m') {
+                                       $periods_to_get = min(floor($secs_since_market_open / (60 * 15)) - 8, 365);
+                                       $max_period = 60 * 25;
+                                       $max_avg_period = 60 * 20;
+                                       $interval_secs = 15 * 60;
+                                       $min_periods = 50;
+                               }
+                               if ($interval == '30m') {
+                                       $periods_to_get = min(floor($secs_since_market_open / (60 * 30)) - 4, 365);
+                                       $max_period = 60 * 50;
+                                       $max_avg_period = 60 * 40;
+                                       $interval_secs = 30 * 60;
+                                       $min_periods = 50;
+                               }
+                               if ($interval == '1h') {
+                                       $periods_to_get = min(floor($secs_since_market_open / (60 * 60)), 365 - 2);
+                                       $max_period = 60 * 120;
+                                       $max_avg_period = 60 * 70;
+                                       $interval_secs = 60 * 60;
+                                       $min_periods = 40;
+                               }
+		return [$periods_to_get, $max_period, $max_avg_period, $interval_secs, $min_periods];
 	}
+
 }

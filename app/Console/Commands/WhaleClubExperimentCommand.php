@@ -76,90 +76,46 @@ class WhaleClubExperimentCommand extends Command {
 
 		$instruments = ['EUR_USD'];
 		$util = new Util\BrokersUtil();
-		$wc = new Util\Whaleclub($this->instrument);
+		$wc = [];
 		$console = new \Bowhead\Util\Console();
 		$indicators = new \Bowhead\Util\Indicators();
 
-		$cand = new Util\Candles();
+		//$cand = new Util\Candles();
 		$ind = new Util\Indicators();
 
 		$this->wc = $wc;
 		$last_candle_times = [];
 		$skipped = 0;
+		$skip_weekends = TRUE;
+
+		foreach($instruments as $instrument) {
+			$wc[$instrument] = new Util\Whaleclub($instrument);
+		}
 
 		while (1) {
 			if (ord(fgetc(STDIN)) == 113) { // try to catch keypress 'q'
 				echo "QUIT detected...";
 				return null;
 			}
-
-
-			$skip_weekends = TRUE;
-
-			echo "\n";
+			echo "\n -----------------------------------------------------\n";
 
 			foreach (['1m', '5m', '15m', '30m', '1h']  as $interval) {
 				$now = time();
 				$now_date = date('Y-m-d H:i:s', $now);
-
                                 $secs_since_market_open = $now - strtotime(date('Y-m-d 22:00:00', date('w', $now)=="0" ? strtotime('today', $now) : strtotime('last Sunday', $now)));
 
 				echo "-----------------\nInterval $interval (now: $now [$now_date])\n";
 				if($skip_weekends) {
 					echo "\$secs_since_market_open: $secs_since_market_open\n";
 				}
-                               // if skipping weekends, get max num of periods since end of weekend
-				//TODO: Maybe move the following to OHLC class
-                               if ($interval == '1m') {
-                                       $periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / 60), 365) : 365;
-                                       $max_period = 60 * 6;
-                                       $max_avg_period = 75;
-                                       $interval_secs = 60;
-                                       if ($periods_to_get < 300) { // make sure there is a long enough range
-                                               echo "not long enough since weekend for $interval (can only get $periods_to_get periods)\n";
-                                               continue;
-                                       }
-                               }
-                               if ($interval == '5m') {
-                                       $periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / (60 * 5)), 365) : 365;
-                                       $max_period = 60 * 25;
-                                       $max_avg_period = 60 * 8;
-                                       $interval_secs = 5 * 60;
-                                       if ($periods_to_get < 200) { // make sure there is a long enough range
-                                               echo "not long enough since weekend for $interval (can only get $periods_to_get periods)\n";
-                                               continue;
-                                       }
-                               }
-                               if ($interval == '15m') {
-                                       $periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / (60 * 15)), 365) : 365;
-                                       $max_period = 60 * 25;
-                                       $max_avg_period = 60 * 20;
-                                       $interval_secs = 15 * 60;
-                                       if ($periods_to_get < 70) { // make sure there is a long enough range
-                                               echo "not long enough since weekend for $interval (can only get $periods_to_get periods)\n";
-                                               continue;
-                                       }
-                               }
-                               if ($interval == '30m') {
-                                       $periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / (60 * 30)), 365) : 365;
-                                       $max_period = 60 * 50;
-                                       $max_avg_period = 60 * 40;
-                                       $interval_secs = 30 * 60;
-                                       if ($periods_to_get < 50) { // make sure there is a long enough range
-                                               echo "not long enough since weekend for $interval (can only get $periods_to_get periods)\n";
-                                               continue;
-                                       }
-                               }
-                               if ($interval == '1h') {
-                                       $periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / (60 * 60)), 365) : 365;
-                                       $max_period = 60 * 120;
-                                       $max_avg_period = 60 * 70;
-				       $interval_secs = 60 * 60;
-                                       if ($periods_to_get < 40) { // make sure there is a long enough range
-                                               echo "not long enough since weekend for $interval (can only get $periods_to_get periods)\n";
-                                               continue;
-                                       }
-                               }
+
+				list($periods_to_get, $max_period, $max_avg_period, $interval_secs, $min_periods) = Strategies::get_rules_for_interval($interval, $secs_since_market_open);
+
+                                if ($skip_weekends && $periods_to_get < $min_periods) { // make sure there is a long enough range
+                                        echo "not long enough since weekend for $interval (can only get $periods_to_get periods)\n";
+                                        continue;
+                                }
+
 
         			foreach ($instruments as $instrument) {
 					if(isset($last_candle_times[$interval][$instrument]) && ($now - $last_candle_times[$interval][$instrument]) < $interval_secs) {
@@ -190,7 +146,7 @@ class WhaleClubExperimentCommand extends Command {
 					// Note time of most recent candle... so we know how long to "sleep" for, for this interval + instrument
 					$last_candle_times[$interval][$instrument] = max($data['date']);
 
-					$candles = $cand->allCandles($instrument, $data);
+					$candles = $this->candle_value($data);
 					$indicators = $ind->allSignals($instrument, $data);
 
 					echo '.. ask terry..';
@@ -208,7 +164,7 @@ class WhaleClubExperimentCommand extends Command {
 					}
 
 					if ($direction != 0) {
-						$price = $wc->getPrice(str_replace(['/', '_'], '-', $instrument));
+						$price = $wc[$instrument]->getPrice(str_replace(['/', '_'], '-', $instrument));
 						$current_price = $price['price'];
 
 						if (isset($this->last_order_bounds[$instrument]) && $current_price > $this->last_order_bounds[$instrument][0] && $current_price < $this->last_order_bounds[$instrument][1]) {
@@ -236,7 +192,7 @@ class WhaleClubExperimentCommand extends Command {
 											#	, 'entry_price' => $current_price
 									];
 									print_r($order);
-									$position = $wc->positionNew($order);
+									$position = $wc[$instrument]->positionNew($order);
 									$console->colorize("\n$instrument ($interval):: OPENED NEW SHORT POSIITION");
 									print_r($position);
 									if (isset($position['entered_at'])) {
@@ -261,7 +217,7 @@ class WhaleClubExperimentCommand extends Command {
 											#        , 'entry_price' => $current_price
 									];
 									print_r($order);
-									$position = $wc->positionNew($order);
+									$position = $wc[$instrument]->positionNew($order);
 									$console->colorize("\n$instrument ($interval):: OPENED NEW LONG POSIITION");
 									print_r($position);
 									if (isset($position['entered_at'])) {

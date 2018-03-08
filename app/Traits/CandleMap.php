@@ -30,7 +30,7 @@ trait CandleMap
             ,'tasukigap'        => 54
             ,'thrusting'        => 57
             ,'upsidegap2crows'  => 60
-            ,'xsidegap3methods' => 62
+            ,'sidegap3methods' => 62
         ]
         ,'bull' => [
              '3linestrike'      => 63
@@ -199,24 +199,26 @@ trait CandleMap
             if (in_array($key, $price_reversal_bear_keys)){
                 $ret['reverse_bear'] = $ret['reverse_bear'] ?? 0;
                 $ret['reverse_bear'] = ($this->price_reversal['bear'][$key] > $ret['reverse_bear'] ? $this->price_reversal['bear'][$key] : $ret['reverse_bear']);
-                $ret['reverse_bear_total'] =  (@$ret['reverse_bear_total'] + $this->price_reversal['bear'][$key] ?? $this->price_reversal['bear'][$key]);
+                $ret['reverse_bear_total'] =  (@$ret['reverse_bear_total'] + $this->price_reversal['bear'][$key];// ?? $this->price_reversal['bear'][$key]);
             }
             if (in_array($key, $price_reversal_bull_keys)){
                 $ret['reverse_bull'] = $ret['reverse_bull'] ?? 0;
                 $ret['reverse_bull'] = ($this->price_reversal['bull'][$key] > $ret['reverse_bull'] ? $this->price_reversal['bull'][$key] : $ret['reverse_bull']);
-                $ret['reverse_bull_total'] =  (@$ret['reverse_bull_total'] + $this->price_reversal['bull'][$key] ?? $this->price_reversal['bull'][$key]);
+                $ret['reverse_bull_total'] =  (@$ret['reverse_bull_total'] + $this->price_reversal['bull'][$key];// ?? $this->price_reversal['bull'][$key]);
             }
 
             /** price continuation */
             if (in_array($key, $price_continuation_bull_keys) || in_array($key, $counter_purpose_bear_keys)){
+				$candle_set = in_array($key, $price_continuation_bull_keys) ? $this->price_continuation['bull'] : $this->counter_purpose['bear'];
                 $ret['continue_bull'] = $ret['continue_bull'] ?? 0;
-                $ret['continue_bull'] = ($this->price_continuation['bull'][$key] > $ret['continue_bull'] ? $this->price_continuation['bull'][$key] : $ret['continue_bull']);
-                $ret['continue_bull_total'] =  (@$ret['continue_bull_total'] + $this->price_continuation['bull'][$key] ?? $this->price_continuation['bull'][$key]);
+                $ret['continue_bull'] = ($candle_set[$key] > $ret['continue_bull'] ? $candle_set[$key] : $ret['continue_bull']);
+                $ret['continue_bull_total'] =  (@$ret['continue_bull_total'] + $candle_set[$key];// ?? $candle_set[$key]);
             }
             if (in_array($key, $price_continuation_bear_keys) || in_array($key, $counter_purpose_bull_keys)){
+				$candle_set = in_array($key, $price_continuation_bear_keys) ? $this->price_continuation['bear'] : $this->counter_purpose['bull'];
                 $ret['continue_bear'] = $ret['continue_bear'] ?? 0;
-                $ret['continue_bear'] = ($this->price_continuation['bear'][$key] > $ret['continue_bear'] ? $this->price_continuation['bear'][$key] : $ret['continue_bear']);
-                $ret['continue_bear_total'] =  (@$ret['continue_bear_total'] + $this->price_continuation['bear'][$key] ?? $this->price_continuation['bear'][$key]);
+                $ret['continue_bear'] = ($candle_set[$key] > $ret['continue_bear'] ? $candle_set[$key] : $ret['continue_bear']);
+                $ret['continue_bear_total'] =  (@$ret['continue_bear_total'] + $candle_set[$key];// ?? $this->price_continuation['bear'][$key]);
             }
         }
         $return['current'] = $ret;
@@ -231,27 +233,67 @@ trait CandleMap
             if (in_array($key, $price_reversal_bear_keys)){
                 $ret['reverse_bear'] = $ret['reverse_bear'] ?? 0;
                 $ret['reverse_bear'] = ($this->price_reversal['bear'][$key] > $ret['reverse_bear'] ? $this->price_reversal['bear'][$key] : $ret['reverse_bear']);
-                $ret['reverse_bear_total'] =  (@$ret['reverse_bear_total'] + $this->price_reversal['bear'][$key] ?? $this->price_reversal['bear'][$key]);
+                $ret['reverse_bear_total'] =  (@$ret['reverse_bear_total'] + $this->price_reversal['bear'][$key];// ?? $this->price_reversal['bear'][$key]);
             }
             if (in_array($key, $price_reversal_bull_keys)){
                 $ret['reverse_bull'] = $ret['reverse_bull'] ?? 0;
                 $ret['reverse_bull'] = ($this->price_reversal['bull'][$key] > $ret['reverse_bull'] ? $this->price_reversal['bull'][$key] : $ret['reverse_bull']);
-                $ret['reverse_bull_total'] =  (@$ret['reverse_bull_total'] + $this->price_reversal['bull'][$key] ?? $this->price_reversal['bull'][$key]);
+                $ret['reverse_bull_total'] =  (@$ret['reverse_bull_total'] + $this->price_reversal['bull'][$key];// ?? $this->price_reversal['bull'][$key]);
             }
 
             /** price continuation */
             if (in_array($key, $price_continuation_bull_keys) || in_array($key, $counter_purpose_bear_keys)){
+				$candle_set = in_array($key, $price_continuation_bull_keys) ? $this->price_continuation['bull'] : $this->counter_purpose['bear'];
                 $ret['continue_bull'] = $ret['continue_bull'] ?? 0;
-                $ret['continue_bull'] = ($this->price_continuation['bull'][$key] > $ret['continue_bull'] ? $this->price_continuation['bull'][$key] : $ret['continue_bull']);
-                $ret['continue_bull_total'] =  (@$ret['continue_bull_total'] + $this->price_continuation['bull'][$key] ?? $this->price_continuation['bull'][$key]);
+                $ret['continue_bull'] = ($candle_set[$key] > $ret['continue_bull'] ? $candle_set[$key] : $ret['continue_bull']);
+                $ret['continue_bull_total'] =  (@$ret['continue_bull_total'] + $candle_set[$key];// ?? $this->price_continuation['bull'][$key]);
             }
             if (in_array($key, $price_continuation_bear_keys) || in_array($key, $counter_purpose_bull_keys)){
+				$candle_set = in_array($key, $price_continuation_bear_keys) ? $this->price_continuation['bear'] : $this->counter_purpose['bull'];
                 $ret['continue_bear'] = $ret['continue_bear'] ?? 0;
-                $ret['continue_bear'] = ($this->price_continuation['bear'][$key] > $ret['continue_bear'] ? $this->price_continuation['bear'][$key] : $ret['continue_bear']);
-                $ret['continue_bear_total'] =  (@$ret['continue_bear_total'] + $this->price_continuation['bear'][$key] ?? $this->price_continuation['bear'][$key]);
+                $ret['continue_bear'] = ($candle_set[$key] > $ret['continue_bear'] ? $candle_set[$key] : $ret['continue_bear']);
+                $ret['continue_bear_total'] =  (@$ret['continue_bear_total'] + $candle_set[$key];// ?? $this->price_continuation['bear'][$key]);
             }
         }
         $return['recent'] = $ret;
         return $return;
     }
+
+
+        static function get_candle_strengths($candles) {
+                $short = $long = 0;
+                                            foreach ($candles['recently'] as $candle_category => $value) {
+                                                        switch($candle_categorty) {
+								case 'indecision':
+	                                                                $short -= $value;
+	                                                                $long -= $value;
+                                                        		break;
+								case 'continue_bear_total':
+								case 'reverse_bear_total':
+									$short += $value;
+									break;
+								case 'continue_bull_total':
+								case 'continue_bull_total':
+									$long += $value;
+									break;
+                                                        } 
+                                                }
+                return ['short' => self::get_candle_strength_from_score($short), 'long' => self::get_candle_strength_from_score($long)];
+        }
+
+        static function get_candle_strength_from_score($score) {
+                if($score > 300) {
+                        return 5;
+                } else if($score > 240) {
+                        return 4;
+                } else if($score > 180) {
+                        return 3;
+                } else if($score > 120) {
+                        return 2;
+                } else if($score > 60) {
+                        return 1;
+                }
+                return 0;
+        }
+
 }
