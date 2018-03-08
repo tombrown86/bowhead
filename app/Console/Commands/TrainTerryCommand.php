@@ -100,6 +100,7 @@ class TrainTerryCommand extends Command {
 		$leverage = 222;
 
 		for ($min = $start_min; $min <= $end_min; $min += 60) {
+			$min_date = date('Y-m-d H:i:s', $min);
 			if ($skip_weekends &&
 				((date('w', $min) == 5 && date('H') >= 20/*22*/)
 					|| date('w', $min) == 6
@@ -120,7 +121,8 @@ class TrainTerryCommand extends Command {
 				// if skipping weekends, get max num of periods since end of weekend
 
 				if ($interval == '1m') {
-					$max_period = 300;
+					$max_period = 60 * 6;
+					$max_avg_period = 75;
 					$periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / 60), 365) : 365;
 
 					if ($periods_to_get < 300) { // make sure there is a long enough range
@@ -129,23 +131,24 @@ class TrainTerryCommand extends Command {
 				}
 				if ($interval == '5m') {
 					$periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / (60 * 5)), 365) : 365;
-					$max_period = 60 * 7;
-
+					$max_period = 60 * 25;
+					$max_avg_period = 60 * 8;
 					if ($min % (60*5) || $periods_to_get < 200) { // make sure there is a long enough range
 						continue;
 					}
 				}
 				if ($interval == '15m') {
 					$periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / (60 * 15)), 365) : 365;
-					$max_period = 60 * 17;
-
+                                        $max_period = 60 * 25;
+                                        $max_avg_period = 60 * 20;
 					if ($min % (60*15) || $periods_to_get < 70) { // make sure there is a long enough range
 						continue;
 					}
 				}
 				if ($interval == '30m') {
 					$periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / (60 * 30)), 365) : 365;
-					$max_period = 60 * 31;
+                                        $max_period = 60 * 50;
+                                        $max_avg_period = 60 * 40;
 
 					if ($min % (60*30) || $periods_to_get < 50) { // make sure there is a long enough range
 						continue;
@@ -153,7 +156,8 @@ class TrainTerryCommand extends Command {
 				}
 				if ($interval == '1h') {
 					$periods_to_get = $skip_weekends ? min(floor($secs_since_market_open / (60 * 60)), 365) : 365;
-					$max_period = 60 * 62;
+                                        $max_period = 60 * 120;
+                                        $max_avg_period = 60 * 70;
 
 					if ($min % 3600 || $periods_to_get < 40) { // make sure there is a long enough range
 						continue;
@@ -164,17 +168,22 @@ class TrainTerryCommand extends Command {
 
 				$data = $this->getRecentData($instrument, $periods_to_get, false, date('H'), $interval, false, $min, false);
 
-				if (count($data['periods']) < $periods_to_get) {
-					$skipped ++;
-					echo "\n !!!!!!!!!!!!!!! Less than $periods_to_get periods returned ($min) for $interval! \n";
-					continue;
-				}
-				if (max($data['periods']) > $max_period) {
-					$skipped ++;
-					echo "\n !!!!!!!!!!!!!!! Skipping, max period was " . max($data['periods']) . "! ($min) for $interval \n";
-					file_put_contents('/tmp/periodcheck', "\n !!!!!!!!!!!!!!! Skipping, max period was " . max($data['periods']) . "! ($min) for $interval \n", FILE_APPEND);
-					continue;
-				}
+                                if (count($data['periods']) < $periods_to_get) {
+                                        $skipped ++;
+                                        echo "$instrument: !!!!!!!!!!!!!!! Only periods ".count($data['periods'])." (less than $periods_to_get) returned for $interval! at time: $min [$min_date] \n";
+                                        continue;
+                                }
+                                if (max($data['periods']) > $max_period) {
+                                        $skipped ++;
+                                        echo "$instrument: !!!!!!!!!!!!!!! Skipping, max period was " . max($data['periods']) . " (greater than ".$max_period.") for $interval! at time: $min [$min_date]  \n";
+                                        continue;
+                                }
+                                if ((array_sum($data['periods']) / count($data['periods'])) > $max_avg_period) {
+                                        $skipped ++;
+                                        echo "$instrument: !!!!!!!!!!!!!!! Skipping, average period was " . (array_sum($data['periods']) / count($data['periods'])) . " (greater than ".$max_avg_period.") for $interval! at time: $min [$min_date]  \n";
+                                        continue;
+                                }
+
 				$current_price = ($data['high'][count($data['low']) - 1] + $data['low'][count($data['low']) - 1]) / 2;
 
 				// candles
@@ -249,6 +258,7 @@ class TrainTerryCommand extends Command {
 								$candle_count++;
 							}
 						}
+						$candle_strength = Strategies::get_candle_strength_from_count($candle_count);
 
 						if ($overbought XOR $underbought) {
 							foreach (['demark', 'fib_r2s2', 'fib_r3s3', 'perc_20_20', 'perc_30_40', 'perc_40_40'/* 'perc_10_20' */] as $bounds_method) {
@@ -280,11 +290,12 @@ class TrainTerryCommand extends Command {
 
 								// keep note of end time for this trade.
 								$strategy_open_position[$bounds_strategy_name] = $result['time'];
-								
+
 								foreach ([$bounds_strategy_name, 'all'] as $bounds_strategy_name) {
-									for ($current_candle_count = 1; $current_candle_count <= $candle_count; $current_candle_count++) { // create row for cand
-										if (!isset($results[$bounds_strategy_name])) {
-											$results[$bounds_strategy_name] = [
+									if(1) {//for ($current_candle_count = $candle_count/*1*/; $current_candle_count <= $candle_count; $current_candle_count++) { 
+										$bounds_strategy_name_with_candle_strength = $bounds_strategy_name . ' + candlestrength:'.$candle_strength;
+										if (!isset($results[$bounds_strategy_name_with_candle_strength])) {
+											$results[$bounds_strategy_name_with_candle_strength] = [
 												'strategy_name' => 'x_candles__and__' . implode('_', $indicators),
 												'bounds_strategy_name' => $bounds_method,
 												'indicator_count' => count($indicators),
@@ -303,7 +314,7 @@ class TrainTerryCommand extends Command {
 												'avg_long_profit' => 0,
 												'avg_short_profit' => 0,
 												'avg_profit' => 0,
-												'candle_count' => $current_candle_count,
+												'candle_strength' => $candle_strength,
 												/* these will be created as necessary
 												  'long_correct_candle' => [],
 												  'long_correct_inverse_candle' => [],
@@ -333,36 +344,36 @@ class TrainTerryCommand extends Command {
 										foreach ([/* 'trend' => $trends[$instrument], */'candle' => isset($candles['current']) ? $candles['current'] : []] as $cot => $cots) {
 											foreach ($cots as $name => $value) {
 												$inverse = (($value > 0 && $long) || ($value < 0 && !$long)) ? '' : 'inverse_';
-												if (!isset($results[$bounds_strategy_name][$prefix . $correct . $cot][$name])) {
-													$results[$bounds_strategy_name][$prefix . $correct . $cot][$name] = 1;
+												if (!isset($results[$bounds_strategy_name_with_candle_strength][$prefix . $correct . $cot][$name])) {
+													$results[$bounds_strategy_name_with_candle_strength][$prefix . $correct . $cot][$name] = 1;
 												} else {
-													$results[$bounds_strategy_name][$prefix . $correct . $cot][$name];
+													$results[$bounds_strategy_name_with_candle_strength][$prefix . $correct . $cot][$name];
 												}
 											}
 										}
 
-										$results[$bounds_strategy_name]['positions_count'] ++;
+										$results[$bounds_strategy_name_with_candle_strength]['positions_count'] ++;
 
-										$result['win'] ? $results[$bounds_strategy_name][($long ? 'long_' : 'short_') . 'wins'] ++ : $results[$bounds_strategy_name][($long ? 'long_' : 'short_') . 'loses'] ++;
-										$result['win'] ? $results[$bounds_strategy_name]['total_wins'] ++ : $results[$bounds_strategy_name]['total_loses'] ++;
-										$long ? $results[$bounds_strategy_name]['total_longs'] ++ : $results[$bounds_strategy_name]['total_shorts'] ++;
+										$result['win'] ? $results[$bounds_strategy_name_with_candle_strength][($long ? 'long_' : 'short_') . 'wins'] ++ : $results[$bounds_strategy_name_with_candle_strength][($long ? 'long_' : 'short_') . 'loses'] ++;
+										$result['win'] ? $results[$bounds_strategy_name_with_candle_strength]['total_wins'] ++ : $results[$bounds_strategy_name_with_candle_strength]['total_loses'] ++;
+										$long ? $results[$bounds_strategy_name_with_candle_strength]['total_longs'] ++ : $results[$bounds_strategy_name_with_candle_strength]['total_shorts'] ++;
 										if ($result['time'] == $endmin) {
-											$results[$bounds_strategy_name]['timeout_loses'] ++;
+											$results[$bounds_strategy_name_with_candle_strength]['timeout_loses'] ++;
 										}
-										$results[$bounds_strategy_name]['wins_plus_loses'] += $result['win'] ? 1 : -1;
+										$results[$bounds_strategy_name_with_candle_strength]['wins_plus_loses'] += $result['win'] ? 1 : -1;
 
 
-										$results[$bounds_strategy_name]['avg_stop_take_range'] = (($results[$bounds_strategy_name]['avg_stop_take_range'] * ($results[$bounds_strategy_name]['positions_count'] - 1)) + abs($take - $stop)) / $results[$bounds_strategy_name]['positions_count'];
+										$results[$bounds_strategy_name_with_candle_strength]['avg_stop_take_range'] = (($results[$bounds_strategy_name_with_candle_strength]['avg_stop_take_range'] * ($results[$bounds_strategy_name_with_candle_strength]['positions_count'] - 1)) + abs($take - $stop)) / $results[$bounds_strategy_name_with_candle_strength]['positions_count'];
 
 										// enter with whole spread as offset (rather than worry ourselves with separate ask + bid)
 										$percentage_profit = $result['percentage_profit'];
 
 										if ($long) {
-											$results[$bounds_strategy_name]['avg_long_profit'] = (($results[$bounds_strategy_name]['avg_long_profit'] * ($results[$bounds_strategy_name]['total_longs'] - 1)) + $percentage_profit) / $results[$bounds_strategy_name]['total_longs'];
+											$results[$bounds_strategy_name_with_candle_strength]['avg_long_profit'] = (($results[$bounds_strategy_name_with_candle_strength]['avg_long_profit'] * ($results[$bounds_strategy_name_with_candle_strength]['total_longs'] - 1)) + $percentage_profit) / $results[$bounds_strategy_name_with_candle_strength]['total_longs'];
 										} else {
-											$results[$bounds_strategy_name]['avg_short_profit'] = (($results[$bounds_strategy_name]['avg_short_profit'] * ($results[$bounds_strategy_name]['total_shorts'] - 1)) + $percentage_profit) / $results[$bounds_strategy_name]['total_shorts'];
+											$results[$bounds_strategy_name_with_candle_strength]['avg_short_profit'] = (($results[$bounds_strategy_name_with_candle_strength]['avg_short_profit'] * ($results[$bounds_strategy_name_with_candle_strength]['total_shorts'] - 1)) + $percentage_profit) / $results[$bounds_strategy_name_with_candle_strength]['total_shorts'];
 										}
-										$results[$bounds_strategy_name]['avg_profit'] = (($results[$bounds_strategy_name]['avg_profit'] * ($results[$bounds_strategy_name]['positions_count'] - 1)) + $percentage_profit) / $results[$bounds_strategy_name]['positions_count'];
+										$results[$bounds_strategy_name_with_candle_strength]['avg_profit'] = (($results[$bounds_strategy_name_with_candle_strength]['avg_profit'] * ($results[$bounds_strategy_name_with_candle_strength]['positions_count'] - 1)) + $percentage_profit) / $results[$bounds_strategy_name_with_candle_strength]['positions_count'];
 									}
 								}
 							}
@@ -440,7 +451,7 @@ class TrainTerryCommand extends Command {
 			}
 			if (!($min % 1296000/* 15 days */) || $min == $end_min) {
 				// store results obj JSON occasionally, so this process can be resumed
-				file_put_contents($results_obj_filename, json_encode($results));
+				file_put_contents("$results_dir/$results_obj_filename", json_encode($results));
 				foreach ($results as $result) {
 
 					$days_of_data = ($min - $start_min) / 60 * 60 * 24;
@@ -466,7 +477,7 @@ class TrainTerryCommand extends Command {
 						, 'shorts_per_day' => (float) @$result['total_shorts'] * $days_of_data
 						, 'indicator_count' => (int) @$result['indicator_count']
 						, 'test_confirmations' => (int) @$result['positions_count']
-						, 'candle_count' => @$result['candle_count']
+						, 'candle_strength' => @$result['candle_strength']
 					];
 //					print_r($data);die;
 					$terry_strategy_knowledge::updateOrCreate($unique_fields, $data);

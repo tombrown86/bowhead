@@ -530,18 +530,18 @@ trait OHLC {
 			if ($ptime == null) {
 				$ptime = $ftime;
 				$periodcheck = $current_time - $ptime;
-				if ($periodcheck > $variance) {
+				if ($die_on_large_period && $periodcheck > $variance) {
 					echo "Most recent data is too old... \$periodcheck > \$variance ($periodcheck > $variance) ... \$current_time=$current_time, \$ptime=$ptime, \$variance=$variance)";
-					$die_on_large_period && die();
+					die();
 				}
 				$periods[] = $periodcheck;
 			} else {
 				/** Check for missing periods * */
 				#echo 'Past Time is '.$ptime.' and current time is '.$ftime."\n";
 				$periodcheck = $ptime - $ftime;
-				if ((int) $periodcheck > (int) $variance) {
+				if ($die_on_large_period  && (int) $periodcheck > (int) $variance) {
 					echo $periodcheck . ' > ' . $variance . ' ' . date('Y-m-d H i s', $ftime) . '  YOU HAVE ' . $validperiods . ' PERIODS OF VALID PRICE DATA OUT OF ' . $limit . '. Please ensure price sync is running and wait for additional data to be logged before trying again. Additionally you could use a smaller time period if available.' . "\n";
-					$die_on_large_period && die();
+					die();
 				}
 				$periods[] = $periodcheck;
 				$validperiods++;

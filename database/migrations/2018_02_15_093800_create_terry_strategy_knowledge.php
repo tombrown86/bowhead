@@ -33,9 +33,9 @@ class CreateTerryStrategyKnowledge extends Migration {
 			$table->decimal('shorts_per_day', 30, 5)->index('shorts_per_day1');
 			$table->integer('indicator_count')->index('indicator_count1');
 			$table->integer('test_confirmations')->index('test_confirmations1');
-			$table->integer('candle_count')->index('candle_count1');
+			$table->integer('candle_strength')->index('candle_strength1');
 
-			$table->unique(['strategy_name', 'bounds_strategy_name', 'instrument', 'candle_count'], 'unique_strat_technique');
+			$table->unique(['strategy_name', 'bounds_strategy_name', 'instrument', 'candle_strength'], 'unique_strat_technique');
 
 
 

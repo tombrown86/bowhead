@@ -9,6 +9,7 @@
 namespace Bowhead\Traits;
 
 use Bowhead\Util\Indicators;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Class Strategies
@@ -1184,17 +1185,24 @@ trait Strategies
 					$quadruples = [];
 					$this->combinations($indicators, 4, $quadruples);
 					$indicator_combinations = array_merge($doubles, $triples, $quadruples);
+
+					(count($indicators) > 4) && $indicator_combinations[] = $indicators; // add full list, for potential exact match
 					$indicator_combinations = array_walk($indicator_combinations, function($indicators) {return 'x_candles__and___'.implode('_', $indicators);});
 
-					$knowledge = \DB::table('terry_strategy_knowledge')
+					$candle_strength = Strategies::get_candle_strength_from_count(${$los.'_candle_count'});
+
+					$knowledge = DB::table('terry_strategy_knowledge')
 						->select(DB::raw('*'))
 						->where('instrument', $pair)
 						->where('percentage_'.$los.'_win', '>', 70) // filter out incomplete results
 						->where('test_confirmations', '>', 5)
 						->where('strategy_name', 'IN', $indicator_combinations) 
-						->where('candle_count', '<=', ${$los.'_candle_count'})
-						->order('avg_'.$los.'_profit, candle_count desc')
+						->where('candle_strength', '<=', $candle_strength)
+						->orderBy('indicator_count', 'desc')
+						->orderBy('avg_'.$los.'_profit', 'desc')
+						->orderBy('candle_strength', 'desc') // take those with most indicator matches first
 						->get();
+					
 					if(count($knowledge)) {
 						return ['signal' => $los, 'bounds_method'=>$knowledge[0]['bounds_strategy_name'], 'long_matches' => $long_matches];
 					}
@@ -1247,5 +1255,18 @@ trait Strategies
 				$this->combinations($arr, $level - 1, $result, $new);
 			}
 		}
+	}
+
+	static function get_candle_strength_from_count($count) {
+		if($count > 7) {
+			return 4;
+		} else if($count > 3) {
+			return 3;
+		} else if($count > 1) {
+			return 2;
+		} else if($count == 1) {
+			return 1;
+		}
+		return 0;
 	}
 }
