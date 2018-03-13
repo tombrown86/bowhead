@@ -1152,55 +1152,84 @@ trait Strategies
 		return ['signal' => 'none'];
 	}
 
+	/**
+	 * From my testing, it seemed roughly 1-5 candle strengths measurements preceeded profitable treades,
+	 * whilst higher strengths were not.. Since we may not have enough strat knowledge
+	 * for each specific candle strength, this method will group each specific strength into low, medium, high ranges.
+	 *
+	function get_candle_strength_range($candle_strength) {
+		switch($candle_strength) {
+			case 1:
+			case 2:
+			case 3:
+			case 4:
+			case 5:
+				return [1,2,3,4,5];
+			case 6:
+			case 7:
+				return [6,7];
+			default: 
+				return [$candle_strength];
+		}
+	}*/
+
 	function check_terry_knowledge($pair, $indicators, $candles, $interval='1m') {
-                $candle_strengths = CandleMap::get_candle_strengths($candles);
+		$candle_strengths = CandleMap::get_candle_strengths($candles);
 
-		if ($candle_strengths['short'] > 0 || $candle_strengths['long'] > 0) {
-			$long_indicators = $short_indicators = [];
-			foreach($indicators as $indicator_name => $indicator_value) {
-				if($indicator_value > 0) {
-					$long_indicators[] = $indicator_name;
-				}
-				else if($indicator_value < 0) {
-					$short_indicators[] = $indicator_name;
-				}
+		$long_indicators = $short_indicators = [];
+		foreach($indicators as $indicator_name => $indicator_value) {
+			if($indicator_value > 0) {
+				$long_indicators[] = $indicator_name;
 			}
-			foreach(['long', 'short'] as $los) {
-				$indicators = ${$los.'_indicators'};
-				if(count($indicators) && $candle_strengths[$los] > 0) {
-					sort($indicators);
-					$doubles = [];
-					$this->combinations($indicators, 2, $doubles);
-					$triples = [];
-					$this->combinations($indicators, 3, $triples);
-					$quadruples = [];
-					$this->combinations($indicators, 4, $quadruples);
-					$indicator_combinations = array_merge($doubles, $triples, $quadruples);
+			else if($indicator_value < 0) {
+				$short_indicators[] = $indicator_name;
+			}
+		}
+		
+		foreach(['long', 'short'] as $los) {
+			$indicators = ${$los.'_indicators'};
+			echo '.. '.count($indicators).' '.$los.' indicators and '.$los.'  candle strength '.$candle_strengths[$los].'...';
+			if(count($indicators) && $candle_strengths[$los] > 0) {
+				sort($indicators);
+				$doubles = [];
+				$this->combinations($indicators, 2, $doubles);
+				$triples = [];
+				$this->combinations($indicators, 3, $triples);
+				$quadruples = [];
+				$this->combinations($indicators, 4, $quadruples);
+				$indicator_combinations = array_merge($doubles, $triples, $quadruples);
 
-					(count($indicators) > 4) && $indicator_combinations[] = $indicators; // add full list, for potential exact match
-					$indicator_combinations = array_walk($indicator_combinations, function($indicators) {return 'x_candles__and___'.implode('_', $indicators);});
+				// get strategy names (indicator combs) for IN clause
+				(count($indicators) > 4) && $indicator_combinations[] = $indicators; // add full list, for potential exact match
+				$strategy_names = [];
+				foreach($indicator_combinations as $combination) {
+					sort($combination);
+					$strategy_names[] = 'x_candles__and__'.implode('_', $combination);
+				}
 
-					$knowledge = DB::table('terry_strategy_knowledge')
-						->select(DB::raw('*'))
-						->where('instrument', $pair)
-						->where('interval', $interval)
-						->where('percentage_'.$los.'_win', '>', 70) // successful strats only
-						->where('test_confirmations', '>', 5) // with enough confirmations to be a valuable stat
-						->where('strategy_name', 'IN', $indicator_combinations) 
-						->where('candle_strength', '<=', $candle_strengths[$los])
-						->orderBy('indicator_count', 'desc')
-						->orderBy('avg_'.$los.'_profit', 'desc')
-						->orderBy('candle_strength', 'desc'); // take those with most indicator matches first
+//				DB::enableQueryLog();
+				$knowledge = DB::table('terry_strategy_knowledge')
+					->select(DB::raw('*'))
+					->where('instrument', $pair)
+					->where('interval', $interval)
+					->where('percentage_'.$los.'_win', '>', 70) // successful strats only
+					->where('test_confirmations', '>=', 5) // with enough confirmations to be a valuable stat
+					->where('candle_strength', '>', 0)
+					->whereIn('strategy_name', $strategy_names) 
+//					->whereIn('candle_strength', $this->get_candle_strength_range($candle_strengths[$los]))
+					->orderByRaw('indicator_count desc, avg_'.$los.'_profit desc '); //(candle_strength = '.(int)$candle_strengths[$los].') desc, 
 
-					echo $knowledge->toSql();
-					$knowledge = $knowledge->get();
+				$knowledge = $knowledge->get();
+				
+//				print_r(DB::getQueryLog());
+//				DB::disableQueryLog();
 
-					if(count($knowledge)) {
-						return ['signal' => $los, 'bounds_method'=>$knowledge[0]['bounds_strategy_name'], 'long_matches' => $long_matches];
-					}
+				if(count($knowledge)) {
+					return ['signal' => $los, 'bounds_method'=>$knowledge[0]['bounds_strategy_name'], 'long_matches' => $long_matches];
 				}
 			}
 		}
+		
 		return ['signal' => 'none'];
 	}
 

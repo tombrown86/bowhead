@@ -19,14 +19,15 @@ use Bowhead\Models;
  * Class ExampleCommand
  * @package Bowhead\Console\Commands
  */
-ini_set('memory_limit', '2G');
+ini_set('memory_limit', '8G');
+
 class TrainTerryCommand extends Command {
 
 	use Signals,
-     Strategies,
-     CandleMap,
-     OHLC,
-     Pivots; // add our traits
+	 Strategies,
+	 CandleMap,
+	 OHLC,
+	 Pivots; // add our traits
 
 	/**
 	 * The console command name.
@@ -64,7 +65,7 @@ class TrainTerryCommand extends Command {
 		$util = new Util\BrokersUtil();
 		$console = new \Bowhead\Util\Console();
 		$indicators = new \Bowhead\Util\Indicators();
-		//$cand = new Util\Candles();
+		$cand = new Util\Candles();
 		$ind = new Util\Indicators();
 
 		$instrument = 'EUR/USD';
@@ -102,9 +103,7 @@ class TrainTerryCommand extends Command {
 		for ($min = $start_min; $min <= $end_min; $min += 60) {
 			$min_date = date('Y-m-d H:i:s', $min);
 			if ($skip_weekends &&
-				((date('w', $min) == 5 && date('H') >= 20/*22*/)
-					|| date('w', $min) == 6
-					|| (date('w', $min) == 0 && date('H') < 22))) { // continue if market closed
+					((date('w', $min) == 5 && date('H') >= 20/* 22 */) || date('w', $min) == 6 || (date('w', $min) == 0 && date('H') < 22))) { // continue if market closed
 				continue;
 			}
 
@@ -116,7 +115,7 @@ class TrainTerryCommand extends Command {
 			}
 
 			foreach (['1m', '5m', '15m', '30m', '1h'] as $interval) {
-				$secs_since_market_open = $min - strtotime(date('Y-m-d 22:00:00', date('w', $min)=="0" ? strtotime('today', $min) : strtotime('last Sunday', $min)));
+				$secs_since_market_open = $min - strtotime(date('Y-m-d 22:00:00', date('w', $min) == "0" ? strtotime('today', $min) : strtotime('last Sunday', $min)));
 
 				list($periods_to_get, $max_period, $max_avg_period, $interval_secs, $min_periods) = Strategies::get_rules_for_interval($interval, $secs_since_market_open);
 
@@ -125,10 +124,10 @@ class TrainTerryCommand extends Command {
 					continue;
 				}
 
-                                if ($skip_weekends && $periods_to_get < $min_periods) { // make sure there is a long enough range
-                                        echo "not long enough since weekend for $interval (can only get $periods_to_get periods) ... minimum we want is $min_periods \n";
-                                        continue;
-                                }
+				if ($skip_weekends && $periods_to_get < $min_periods) { // make sure there is a long enough range
+					echo "not long enough since weekend for $interval (can only get $periods_to_get periods) ... minimum we want is $min_periods \n";
+					continue;
+				}
 
 
 				$win_or_lose_short = $win_or_lose_long = []; //keep results here as we have multiple strats to check 
@@ -136,27 +135,27 @@ class TrainTerryCommand extends Command {
 				echo "$instrument: get recent data, get $periods_to_get periods of $interval data..";
 				$data = $this->getRecentData($instrument, $periods_to_get, false, date('H'), $interval, false, $min, false);
 
-                                if (count($data['periods']) < $periods_to_get) {
-                                        $skipped ++;
-                                        echo "$instrument: !!!!!!!!!!!!!!! Only periods ".count($data['periods'])." (less than $periods_to_get) returned for $interval! at time: $min [$min_date] \n";
-                                        continue;
-                                }
-                                if (max($data['periods']) > $max_period) {
-                                        $skipped ++;
-                                        echo "$instrument: !!!!!!!!!!!!!!! Skipping, max period was " . max($data['periods']) . " (greater than ".$max_period.") for $interval! at time: $min [$min_date]  \n";
-                                        continue;
-                                }
-                                if ((array_sum($data['periods']) / count($data['periods'])) > $max_avg_period) {
-                                        $skipped ++;
-                                        echo "$instrument: !!!!!!!!!!!!!!! Skipping, average period was " . (array_sum($data['periods']) / count($data['periods'])) . " (greater than ".$max_avg_period.") for $interval! at time: $min [$min_date]  \n";
-                                        continue;
-                                }
+				if (count($data['periods']) < $periods_to_get) {
+					$skipped ++;
+					echo "$instrument: !!!!!!!!!!!!!!! Only periods " . count($data['periods']) . " (less than $periods_to_get) returned for $interval! at time: $min [$min_date] \n";
+					continue;
+				}
+				if (max($data['periods']) > $max_period) {
+					$skipped ++;
+					echo "$instrument: !!!!!!!!!!!!!!! Skipping, max period was " . max($data['periods']) . " (greater than " . $max_period . ") for $interval! at time: $min [$min_date]  \n";
+					continue;
+				}
+				if ((array_sum($data['periods']) / count($data['periods'])) > $max_avg_period) {
+					$skipped ++;
+					echo "$instrument: !!!!!!!!!!!!!!! Skipping, average period was " . (array_sum($data['periods']) / count($data['periods'])) . " (greater than " . $max_avg_period . ") for $interval! at time: $min [$min_date]  \n";
+					continue;
+				}
 
 				$current_price = ($data['high'][count($data['low']) - 1] + $data['low'][count($data['low']) - 1]) / 2;
 
 				// candles
 				$candles = $this->candle_value($data);
-
+//				$candles = $cand->allCandles('', $data);
 				// signals
 //				$signals = $this->signals(1, 0, ['EUR/USD'], $data);
 				// trends
@@ -216,9 +215,9 @@ class TrainTerryCommand extends Command {
 					}
 
 
-                                        $candle_strengths = CandleMap::get_candle_strengths($candles);
-                                        $overbought = $indicators_overbought && $candle_strengths['short'] > 0;
-                                        $underbought = $indicators_underbought && $candle_strengths['long'] > 0;
+					$candle_strengths = CandleMap::get_candle_strengths($candles);
+					$overbought = $indicators_overbought && $candle_strengths['short'] != 0;
+					$underbought = $indicators_underbought && $candle_strengths['long'] != 0;
 
 
 					if ($underbought XOR $overbought) {
@@ -255,8 +254,8 @@ class TrainTerryCommand extends Command {
 							$strategy_open_position[$bounds_strategy_name] = $result['time'];
 
 							foreach ([$bounds_strategy_name, 'all'] as $bounds_strategy_name) {
-								if(1) {//for ($current_candle_count = $candle_count/*1*/; $current_candle_count <= $candle_count; $current_candle_count++) { 
-									$bounds_strategy_name_with_candle_strength = $bounds_strategy_name . ' + candlestrength:'.$candle_strength;
+								if (1) {//for ($current_candle_count = $candle_count/*1*/; $current_candle_count <= $candle_count; $current_candle_count++) { 
+									$bounds_strategy_name_with_candle_strength = $bounds_strategy_name . ' + candlestrength:' . $candle_strength;
 									if (!isset($results[$bounds_strategy_name_with_candle_strength])) {
 										$results[$bounds_strategy_name_with_candle_strength] = [
 											'strategy_name' => 'x_candles__and__' . implode('_', $indicators),
@@ -277,27 +276,27 @@ class TrainTerryCommand extends Command {
 											'avg_long_profit' => 0,
 											'avg_short_profit' => 0,
 											'avg_profit' => 0,
-											'candle_strength' => $candle_strength,
+											'candle_strength' => 1/*$candle_strength*/,
 											'interval' => $interval,
-											/* these will be created as necessary
-											  'long_correct_candle' => [],
-											  'long_correct_inverse_candle' => [],
-											  'long_wrong_candle' => [],
-											  'long_wrong_inverse_candle' => [],
-											  'short_correct_candle' => [],
-											  'short_correct_inverse_candle' => [],
-											  'short_wrong_candle' => [],
-											  'short_wrong_inverse_candle' => [],
+												/* these will be created as necessary
+												  'long_correct_candle' => [],
+												  'long_correct_inverse_candle' => [],
+												  'long_wrong_candle' => [],
+												  'long_wrong_inverse_candle' => [],
+												  'short_correct_candle' => [],
+												  'short_correct_inverse_candle' => [],
+												  'short_wrong_candle' => [],
+												  'short_wrong_inverse_candle' => [],
 
-											  'long_correct_trend' => [],
-											  'long_correct_inverse_trend' => [],
-											  'long_wrong_trend' => [],
-											  'long_wrong_inverse_trend' => [],
-											  'short_correct_trend' => [],
-											  'short_correct_inverse_trend' => [],
-											  'short_wrong_trend' => [],
-											  'short_wrong_inverse_trend' => [],
-											  '% WIN' => 0, */
+												  'long_correct_trend' => [],
+												  'long_correct_inverse_trend' => [],
+												  'long_wrong_trend' => [],
+												  'long_wrong_inverse_trend' => [],
+												  'short_correct_trend' => [],
+												  'short_correct_inverse_trend' => [],
+												  'short_wrong_trend' => [],
+												  'short_wrong_inverse_trend' => [],
+												  '% WIN' => 0, */
 										];
 									}
 

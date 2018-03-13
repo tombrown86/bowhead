@@ -195,7 +195,6 @@ trait CandleMap {
 				if (in_array($key, $this->indecision)) {
 					$ret['indecision'] = $ret['indecision'] + 100;
 				}
-				;
 				/** price reversal */
 				if (in_array($key, $price_reversal_bear_keys)) {
 					$ret['reverse_bear'] = $ret['reverse_bear'] ?? 0;
@@ -265,29 +264,60 @@ trait CandleMap {
 
 	static function get_candle_strengths($candles, $candle_set = 'recent') {
 		$short = $long = 0;
+
 		if(isset($candles[$candle_set])) {
 			foreach ($candles[$candle_set] as $candle_category => $value) {
 				switch ($candle_category) {
 					case 'indecision':
 						$short -= $value;
 						$long -= $value;
+//						return ['short' => -1, 'long' => -1];
 						break;
 					case 'continue_bear_total':
 					case 'reverse_bear_total':
 						$short += $value;
+//						$long -= $value;
 						break;
 					case 'continue_bull_total':
 					case 'reverse_bull_total':
 						$long += $value;
+//						$short -= $value;
 						break;
 				}
 			}
 		}
+//		if(isset($candles['current'])) {
+//			foreach($candles['current'] as $c=>$v) {
+//				if($v > 0) {
+//					$long++;
+//				}
+//				if($v < 0) {
+//					$short++;
+//				}
+//				if(in_array($c, [
+//		'gravestonedoji'
+//		, 'longleggeddoji'
+//		, 'highwave'
+//		, 'rickshawman'
+//		, 'shortline'
+//		, 'spinningtop'
+//	])) {
+//					return ['short' => -1, 'long'=>-1];
+//				}
+//			}
+//		}
+//		return ['short' => $short, 'long'=>$long];
 		return ['short' => self::get_candle_strength_from_score($short), 'long' => self::get_candle_strength_from_score($long)];
 	}
 
 	static function get_candle_strength_from_score($score) {
-		if ($score > 300) {
+		return $score > 60 ? 1 : 0; // dropping support for multiple candle strengths,  for now... as candle strength didn't seem to make much odds!.. I will do more thorough candle comparisons at some point to work out a better strategy for this.
+
+/*		if ($score > 400) {
+			return 7;
+		} else if ($score > 360) {
+			return 6;
+		} else if ($score > 300) {
 			return 5;
 		} else if ($score > 240) {
 			return 4;
@@ -298,7 +328,7 @@ trait CandleMap {
 		} else if ($score > 60) {
 			return 1;
 		}
-		return 0;
+		return 0;*/
 	}
 
 }

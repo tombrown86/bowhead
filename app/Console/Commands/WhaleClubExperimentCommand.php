@@ -1,6 +1,7 @@
 <?php
 
 namespace Bowhead\Console\Commands;
+require_once "Mail.php";
 
 use Bowhead\Console\Kernel;
 use Bowhead\Traits\CandleMap;
@@ -9,6 +10,7 @@ use Illuminate\Console\Command;
 use Bowhead\Traits\Pivots;
 use Bowhead\Traits\Signals;
 use Bowhead\Traits\Strategies;
+use Bowhead\Traits\Mailer;
 use Bowhead\Util;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
@@ -22,16 +24,17 @@ use AndreasGlaser\PPC\PPC; // https://github.com/andreas-glaser/poloniex-php-cli
 class WhaleClubExperimentCommand extends Command {
 
 	use Signals,
-	 Strategies,
-	 CandleMap,
-	 OHLC,
-	 Pivots; // add our traits
+	Strategies,
+	CandleMap,
+	OHLC,
+	Pivots,
+	Mailer; 
 
 	protected $name = 'bowhead:wc_experiment';
 
 	protected $wc;
 
-	protected $positions;
+	protected $positions = [];
 
 	protected $positions_time;
 
@@ -99,6 +102,20 @@ class WhaleClubExperimentCommand extends Command {
 			}
 			echo "\n -----------------------------------------------------\n";
 
+			foreach($this->positions as $i=>$pos) {
+				sleep(10);
+				$p = $wc[$instrument]->positionGet($pos['id']);
+				if(isset($p['profit'])) {
+					file_put_contents('/home/tom/results/wc_experiment_closed '.date('Ymd His'), print_r($pos, 1) . "\n".print_r($p, 1) . "\n-----------------------", FILE_APPEND);
+					if($p['profit'] >= 0) {
+						$this->mailer('WIN!', [$p, $pos]);
+					} else {
+						$this->mailer('LOSE!', [$p, $pos]);
+					}
+					unset($this->positions[$i]);
+				}
+			}
+
 			foreach (['1m', '5m', '15m', '30m', '1h']  as $interval) {
 				$now = time();
 				$now_date = date('Y-m-d H:i:s', $now);
@@ -112,13 +129,13 @@ class WhaleClubExperimentCommand extends Command {
 				list($periods_to_get, $max_period, $max_avg_period, $interval_secs, $min_periods) = Strategies::get_rules_for_interval($interval, $secs_since_market_open);
 
                                 if ($skip_weekends && $periods_to_get < $min_periods) { // make sure there is a long enough range
-                                        echo "not long enough since weekend for $interval (can only get $periods_to_get periods)\n";
+                                        echo "not long enough since weekend for $interval (can only get $periods_to_get periods) and we want at least $min_periods.. \n";
                                         continue;
                                 }
 
 
         			foreach ($instruments as $instrument) {
-					if(isset($last_candle_times[$interval][$instrument]) && ($now - $last_candle_times[$interval][$instrument]) < $interval_secs) {
+					if(isset($last_candle_times[$interval][$instrument]) && ($now - $last_candle_times[$interval][$instrument]) < $interval_secs/*10 secs leeway so we have time to get tick data*/) {
 						echo "$instrument: ... wait another ".($interval_secs - ($now - $last_candle_times[$interval][$instrument]))." secs before getting $interval data (since last candle time was: ".($last_candle_times[$interval][$instrument] . date(' Y-m-d H:i:s', $last_candle_times[$interval][$instrument])).")\n";
 						continue;
 					}
@@ -152,6 +169,8 @@ class WhaleClubExperimentCommand extends Command {
 					echo '.. ask terry..';
 					$result = $this->check_terry_knowledge($instrument, $indicators, $candles, $interval);
 
+					print_r($result,1);
+					
 					$direction = 0;
 					if ($result['signal'] == 'long') {
 						$direction = 1;
@@ -193,6 +212,7 @@ class WhaleClubExperimentCommand extends Command {
 									];
 									print_r($order);
 									$position = $wc[$instrument]->positionNew($order);
+									
 									$console->colorize("\n$instrument ($interval):: OPENED NEW SHORT POSIITION");
 									print_r($position);
 									if (isset($position['entered_at'])) {
@@ -225,8 +245,12 @@ class WhaleClubExperimentCommand extends Command {
 									}
 								}
 								if (isset($position['entered_at'])) {
+									file_put_contents('/home/tom/results/wc_experiment_opened '.date('Ymd His'), "$instrument position created!:\n".print_r($order, 1) . "\n".print_r($position, 1) . "\n-----------------------", FILE_APPEND);
+									$this->positions[] = $position;
+									$this->mailer($direction > 0 ? 'Going long' : 'Going short', $position);
 									echo "$instrument ($interval):: Created position..\n\n... no new positions until outside bounds: " . print_r($this->last_order_bounds, 1) . "\n\n\n";
 								} else {
+									file_put_contents('/home/tom/results/wc_experiment_opened '.date('Ymd His'), "$instrument POSITION NOT CREATED!!!!\n". print_r($order, 1) . "\n".print_r($position, 1) . "\n-----------------------", FILE_APPEND);
 									echo "$instrument ($interval):: Position not created...! \n";
 								}
 							}
@@ -237,5 +261,4 @@ class WhaleClubExperimentCommand extends Command {
 			sleep(1);
 		}
 	}
-
 }
