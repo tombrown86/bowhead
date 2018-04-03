@@ -68,11 +68,11 @@ class TrainTerryCommand extends Command {
 		$cand = new Util\Candles();
 		$ind = new Util\Indicators();
 
-		$instrument = 'EUR/USD';
+		$instrument = 'EUR/GBP';
 		$interval = '1m';
 		$skip_weekends = TRUE;
 		$results_dir = '/home/tom/results';
-		$results_filename = 'eurusd_QUAN+ALL_SEEN_IND_COMBINATIONs_and_several_BOUNDS_any_candle_all_Intervals';
+		$results_filename = 'eurgbp_QUAN+ALL_SEEN_IND_COMBINATIONs_and_several_BOUNDS_any_candle_all_Intervals';
 		$results_obj_filename = $results_filename . '_RESULTS_OBJ';
 
 		$strategy_open_position = [];
@@ -93,11 +93,11 @@ class TrainTerryCommand extends Command {
 #		for ($take = 150; $take <= 150; $take+=25) {
 		$skipped = 0;
 		$take = 150;
-//		$results = json_decode(file_get_contents($results_obj_filename));
-		$results = [];
+		$results = (array)json_decode(file_get_contents("$results_dir/$results_obj_filename"), TRUE);
+//		$results = [];
 		$end_min = strtotime('2018-01-01 00:00:00');
-		$start_min = strtotime('2015-01-03 00:00:00');
-		$spread = '0.01';
+		$start_min = strtotime('2016-09-26 00:00:00');
+		$spread = '0.01'; // fixed for now..
 		$leverage = 222;
 
 		for ($min = $start_min; $min <= $end_min; $min += 60) {
@@ -157,7 +157,7 @@ class TrainTerryCommand extends Command {
 				$candles = $this->candle_value($data);
 //				$candles = $cand->allCandles('', $data);
 				// signals
-//				$signals = $this->signals(1, 0, ['EUR/USD'], $data);
+//				$signals = $this->signals(1, 0, ['EUR/GBP'], $data);
 				// trends
 //				foreach ($instruments as $instrument) {
 //					$trends[$instrument]['httc'] = $ind->httc($instrument, $data);   # Hilbert Transform - Trend vs Cycle Mode
@@ -166,7 +166,7 @@ class TrainTerryCommand extends Command {
 //					$trends[$instrument]['mmi'] = $ind->mmi($instrument, $data); # market meanness
 //				}
 				// our indicators
-				$indicator_results = $ind->allSignals('EUR/USD', $data);
+				$indicator_results = $ind->allSignals($instrument, $data);
 
 //				foreach($trends[$instrument] as $trend_name=>$trend_value) { if($trend_value != 0) {
 				// as we go, add specific combinations 
@@ -240,12 +240,12 @@ class TrainTerryCommand extends Command {
 
 							if ($long) {
 								if (!isset($win_or_lose_long[$bounds_method])) {
-									$win_or_lose_long[$bounds_method] = $this->getWinOrLoose('EUR/USD', $min, $endmin, TRUE, $take, $stop, $current_price, $leverage, $spread);
+									$win_or_lose_long[$bounds_method] = $this->getWinOrLoose($instrument, $min, $endmin, TRUE, $take, $stop, $current_price, $leverage, $spread);
 								}
 								$result = $win_or_lose_long[$bounds_method];
 							} else {
 								if (!isset($win_or_lose_short[$bounds_method])) {
-									$win_or_lose_short[$bounds_method] = $this->getWinOrLoose('EUR/USD', $min, $endmin, FALSE, $take, $stop, $current_price, $leverage, $spread);
+									$win_or_lose_short[$bounds_method] = $this->getWinOrLoose($instrument, $min, $endmin, FALSE, $take, $stop, $current_price, $leverage, $spread);
 								}
 								$result = $win_or_lose_short[$bounds_method];
 							}
@@ -411,8 +411,9 @@ class TrainTerryCommand extends Command {
 				echo "\n\n $instrument: Inserting ";
 			}
 			if (!($min % 1296000/* 15 days */) || $min == $end_min) {
-				// store results obj JSON occasionally, so this process can be resumed
+				// store results obj JSON occasionally, so this process can be resumed, in theory
 				file_put_contents("$results_dir/$results_obj_filename", json_encode($results));
+				file_put_contents("$results_dir/$results_obj_filename"."_time", date('Y-m-d H:i:s',$min));
 				foreach ($results as $result) {
 
 					$days_of_data = ($min - $start_min) / 60 * 60 * 24;

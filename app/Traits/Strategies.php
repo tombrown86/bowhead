@@ -1185,7 +1185,7 @@ trait Strategies
 				$short_indicators[] = $indicator_name;
 			}
 		}
-		
+
 		foreach(['long', 'short'] as $los) {
 			$indicators = ${$los.'_indicators'};
 			echo '.. '.count($indicators).' '.$los.' indicators and '.$los.'  candle strength '.$candle_strengths[$los].'...';
@@ -1207,22 +1207,22 @@ trait Strategies
 					$strategy_names[] = 'x_candles__and__'.implode('_', $combination);
 				}
 
-//				DB::enableQueryLog();
+				DB::enableQueryLog();
 				$knowledge = DB::table('terry_strategy_knowledge')
 					->select(DB::raw('*'))
 					->where('instrument', $pair)
 					->where('interval', $interval)
-					->where('percentage_'.$los.'_win', '>', 70) // successful strats only
+					->where('percentage_'.$los.'_win', '>=', 50) // successful strats only
 					->where('test_confirmations', '>=', 5) // with enough confirmations to be a valuable stat
-					->where('candle_strength', '>', 0)
+//					->where('candle_strength', '>', 0)
 					->whereIn('strategy_name', $strategy_names) 
 //					->whereIn('candle_strength', $this->get_candle_strength_range($candle_strengths[$los]))
 					->orderByRaw('indicator_count desc, avg_'.$los.'_profit desc '); //(candle_strength = '.(int)$candle_strengths[$los].') desc, 
 
 				$knowledge = $knowledge->get();
 				
-//				print_r(DB::getQueryLog());
-//				DB::disableQueryLog();
+				//file_put_contents('/home/tom/results/wc_experiment_queries', print_r(DB::getQueryLog(), 1), FILE_APPEND);
+				DB::disableQueryLog();
 
 				if(count($knowledge)) {
 					return ['signal' => $los, 'bounds_method'=>$knowledge[0]['bounds_strategy_name'], 'long_matches' => $long_matches];
@@ -1282,8 +1282,8 @@ trait Strategies
 	static function get_rules_for_interval($interval, $secs_since_market_open=PHP_INT_MAX) {
                                if ($interval == '1m') {
                                        $periods_to_get = min(floor($secs_since_market_open / 60) - 50, 365);
-                                       $max_period = 60 * 6;
-                                       $max_avg_period = 75;
+                                       $max_period = 60 * 8;
+                                       $max_avg_period = 80;
                                        $interval_secs = 60;
                                        $min_periods = 300;
                                }

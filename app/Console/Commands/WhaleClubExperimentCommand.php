@@ -74,10 +74,11 @@ class WhaleClubExperimentCommand extends Command {
 	 *  this is the part of the command that executes.
 	 */
 	public function handle() {
+		ini_set('memory_limit','2G');
 		echo "PRESS 'q' TO QUIT AND CLOSE ALL POSITIONS\n\n\n";
 		stream_set_blocking(STDIN, 0);
 
-		$instruments = ['EUR_USD'];
+		$instruments = ['EUR_USD', 'EUR_GBP'];
 		$util = new Util\BrokersUtil();
 		$wc = [];
 		$console = new \Bowhead\Util\Console();
@@ -89,7 +90,7 @@ class WhaleClubExperimentCommand extends Command {
 		$this->wc = $wc;
 		$last_candle_times = [];
 		$skipped = 0;
-		$skip_weekends = TRUE;
+		$skip_weekends = FALSE;
 
 		foreach($instruments as $instrument) {
 			$wc[$instrument] = new Util\Whaleclub($instrument);
@@ -170,7 +171,7 @@ class WhaleClubExperimentCommand extends Command {
 					$result = $this->check_terry_knowledge($instrument, $indicators, $candles, $interval);
 
 					print_r($result,1);
-					
+
 					$direction = 0;
 					if ($result['signal'] == 'long') {
 						$direction = 1;
@@ -191,7 +192,9 @@ class WhaleClubExperimentCommand extends Command {
 						} else {
 							echo ", Strong signal! .. current price found: $current_price..\n\n";
 							$this->last_order_bounds[$instrument] = null;
-
+							file_put_contents('/home/tom/results/wc_experiment_attempted_opened '.date('Ymd His'), "$instrument position open attempt!"
+									. " result:".print_r($result).":\n-----------------------"
+									, FILE_APPEND);
 							if (is_numeric($current_price) && $current_price > 0) {
 								if ($direction < 0) {
 									echo "$instrument ($interval) at $now [$now_date]:   It's happening, going SHORT..\n";
