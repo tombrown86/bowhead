@@ -90,7 +90,7 @@ class WhaleClubExperimentCommand extends Command {
 		$this->wc = $wc;
 		$last_candle_times = [];
 		$skipped = 0;
-		$skip_weekends = FALSE;
+		$skip_weekends = TRUE;
 
 		foreach($instruments as $instrument) {
 			$wc[$instrument] = new Util\Whaleclub($instrument);
@@ -120,7 +120,7 @@ class WhaleClubExperimentCommand extends Command {
 			foreach (['1m', '5m', '15m', '30m', '1h']  as $interval) {
 				$now = time();
 				$now_date = date('Y-m-d H:i:s', $now);
-                                $secs_since_market_open = $now - strtotime(date('Y-m-d 22:00:00', date('w', $now)=="0" ? strtotime('today', $now) : strtotime('last Sunday', $now)));
+                                $secs_since_market_open = $skip_weekends ? ($now - strtotime(date('Y-m-d 22:00:00', date('w', $now)=="0" ? strtotime('today', $now) : strtotime('last Sunday', $now)))) : PHP_INT_MAX;
 
 				echo "-----------------\nInterval $interval (now: $now [$now_date])\n";
 				if($skip_weekends) {
@@ -151,7 +151,7 @@ class WhaleClubExperimentCommand extends Command {
 	                                }
 	                                if (max($data['periods']) > $max_period) {
                                 	        $skipped ++;
-                        	                echo "$instrument: !!!!!!!!!!!!!!! Skipping, max period was " . max($data['periods']) . " (greater than ".$max_period.") for $interval! at time: $now [$now_date]  \n";
+                        	                echo "$instrument: !!!!!!!!!!!!!!! Skipping, max period was " . max($data['periods']) . " (greater than ".$max_period.", found at time ".date('Y-m-d H:i:s', $data['date'][array_search(max($data['periods']), $data['periods'])]).") for $interval! at time: $now [$now_date]  \n";
         	                                continue;
 	                                }
                                         if ((array_sum($data['periods']) / count($data['periods'])) > $max_avg_period) {
