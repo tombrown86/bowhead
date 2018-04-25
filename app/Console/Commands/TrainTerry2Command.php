@@ -21,7 +21,7 @@ use Bowhead\Models;
  */
 ini_set('memory_limit', '8G');
 
-class TrainTerryCommand extends Command {
+class TrainTerry2Command extends Command {
 
 	use Signals,
 	 Strategies,
@@ -34,7 +34,7 @@ class TrainTerryCommand extends Command {
 	 *
 	 * @var string
 	 */
-	protected $name = 'train_terry';
+	protected $name = 'train_terry2';
 	protected $description = '';
 	protected $order_cooloff;
 
@@ -68,45 +68,25 @@ class TrainTerryCommand extends Command {
 		$cand = new Util\Candles();
 		$ind = new Util\Indicators();
 
-		$instrument = 'EUR/GBP';
+		$instrument = 'GBP/USD';
 		$interval = '1m';
 		$skip_weekends = TRUE;
 		$results_dir = '/home/tom/results';
-		$results_filename = 'eurgbp_QUAN+ALL_SEEN_IND_COMBINATIONs_and_several_BOUNDS_any_candle_all_Intervals_higher_comb_count';
 
-		$results_filename = 'eurgbp_QUAN+ALL_SEEN_IND_COMBINATIONs_and_several_BOUNDS_any_candle_all_Intervals';
+		$results_filename = 'gbpusd_exactmatches_many_bounds';
 
 		$results_obj_filename = $results_filename . '_RESULTS_OBJ';
 
 		$strategy_open_position = [];
 
 		$list_indicators = array('adx', 'aroonosc', 'cmo', 'sar', 'cci', 'mfi', 'obv', 'stoch', 'rsi', 'macd', 'bollingerBands', 'atr', 'er', 'hli', 'ultosc', 'willr', 'roc', 'stochrsi');
-//		$list_signals = ['rsi', 'stoch', 'stochrsi', 'macd', 'adx', 'willr', 'cci', 'atr', 'hli', 'ultosc', 'roc', 'er'];
 
-
-		$doubles = [];
-		$this->combinations($list_indicators, 2, $doubles);
-		$triples = [];
-		$this->combinations($list_indicators, 3, $triples);
-		$quadruples = [];
-		$this->combinations($list_indicators, 4, $quadruples);
-		$indicator_combinations = array_merge($doubles, $triples, $quadruples);
-/*		$indicator_combinations = [];
-		for($i=6; $i < 7/*count($list_indicators)* /;$i++) {
-			$set = [];
-			$this->combinations($list_indicators, $i, $set);
-			$indicator_combinations = array_merge($indicator_combinations, $set);
-		}*/
-
-//print_r($indicator_combinations);die(count($indicator_combinations));
-
-#		for ($take = 150; $take <= 150; $take+=25) {
 		$skipped = 0;
 		$take = 150;
-		$results = (array)json_decode(file_get_contents("$results_dir/$results_obj_filename"), TRUE); // (rememeber to update $start_mind !)
-//		$results = [];
+//		$results = (array)json_decode(file_get_contents("$results_dir/$results_obj_filename"), TRUE); // (rememeber to update $start_mind !)
+		$results = [];
 		$end_min = strtotime('2018-01-01 00:00:00');
-		$start_min = strtotime('2016-07-28 00:00:00');
+		$start_min = strtotime('2015-01-03 00:00:00');
 		$spread = '0.01'; // fixed for now..
 		$leverage = 222;
 
@@ -142,7 +122,7 @@ class TrainTerryCommand extends Command {
 
 				$win_or_lose_short = $win_or_lose_long = []; //keep results here as we have multiple strats to check 
 
-				echo "$instrument: get recent data, get $periods_to_get periods of $interval data..";
+				echo get_class($this)." - $instrument: get recent data, get $periods_to_get periods of $interval data..";
 				$data = $this->getRecentData($instrument, $periods_to_get, false, date('H'), $interval, false, $min, false);
 
 				if (count($data['periods']) < $periods_to_get) {
@@ -165,22 +145,13 @@ class TrainTerryCommand extends Command {
 
 				// candles
 				$candles = $this->candle_value($data);
-//				$candles = $cand->allCandles('', $data);
-				// signals
-//				$signals = $this->signals(1, 0, ['EUR/GBP'], $data);
-				// trends
-//				foreach ($instruments as $instrument) {
-//					$trends[$instrument]['httc'] = $ind->httc($instrument, $data);   # Hilbert Transform - Trend vs Cycle Mode
-//					$trends[$instrument]['htl'] = $ind->htl($instrument, $data); # Hilbert Transform - Instantaneous Trendline
-//					$trends[$instrument]['hts'] = $ind->hts($instrument, $data, true); # Hilbert Transform - Sinewave
-//					$trends[$instrument]['mmi'] = $ind->mmi($instrument, $data); # market meanness
-//				}
-				// our indicators
 				$indicator_results = $ind->allSignals($instrument, $data);
 
-//				foreach($trends[$instrument] as $trend_name=>$trend_value) { if($trend_value != 0) {
 				// as we go, add specific combinations 
+				$indicator_combinations = [];
 				$overbought_indicators = $underbought_indicators = [];
+				$indicators_overbought = $indicators_underbought = FALSE;
+
 				foreach ($indicator_results as $indicator => $value) {
 					if ($value > 0) {
 						$underbought_indicators[] = $indicator;
@@ -188,22 +159,18 @@ class TrainTerryCommand extends Command {
 					if ($value < 0) {
 						$overbought_indicators[] = $indicator;
 					}
-					if (count($overbought_indicators) > 4) {
+					if (count($overbought_indicators) > 0) {
 						sort($overbought_indicators);
-						if (!in_array($overbought_indicators, $indicator_combinations)) {
-							$indicator_combinations[] = $overbought_indicators;
-						}
+						$indicator_combinations['overbought'] = $overbought_indicators;
 					}
-					if (count($underbought_indicators) > 4) {
+					if (count($underbought_indicators) > 0) {
 						sort($underbought_indicators);
-						if (!in_array($underbought_indicators, $indicator_combinations)) {
-							$indicator_combinations[] = $underbought_indicators;
-						}
+						$indicator_combinations['underbought'] = $underbought_indicators;
 					}
 				}
 
 
-				foreach ($indicator_combinations as $indicators) {
+				foreach ($indicator_combinations as $overbought_or_underbought => $indicators) { // for terry 2, indicator combinations will only have a size of 1 or 2
 					$strategy_name = $interval;
 					foreach ($indicators as $indicator_name) {
 						$strategy_name .= '_' . $indicator_name;
@@ -213,17 +180,8 @@ class TrainTerryCommand extends Command {
 						continue;
 					}
 
-					$indicators_overbought = $indicators_underbought = TRUE;
-					foreach ($indicators as $indicator) {
-						if (!isset($indicator_results[$indicator])) {
-							$indicators_overbought = $indicators_underbought = FALSE;
-							break;
-						}
-
-						$indicators_overbought = $indicators_overbought && $indicator_results[$indicator] < 0;
-						$indicators_underbought = $indicators_underbought && $indicator_results[$indicator] > 0;
-					}
-
+					$indicators_overbought = $overbought_or_underbought == 'overbought';
+					$indicators_underbought = $overbought_or_underbought == 'underbought';
 
 					$candle_strengths = CandleMap::get_candle_strengths($candles);
 					$overbought = $indicators_overbought && $candle_strengths['short'] != 0;
@@ -268,7 +226,7 @@ class TrainTerryCommand extends Command {
 									$bounds_strategy_name_with_candle_strength = $bounds_strategy_name . ' + candlestrength:' . $candle_strength;
 									if (!isset($results[$bounds_strategy_name_with_candle_strength])) {
 										$results[$bounds_strategy_name_with_candle_strength] = [
-											'strategy_name' => 'x_candles__and__' . implode('_', $indicators),
+											'strategy_name' => 'exactmatch: ' . implode('_', $indicators),
 											'bounds_strategy_name' => $bounds_method,
 											'indicator_count' => count($indicators),
 											'long_wins' => 0,

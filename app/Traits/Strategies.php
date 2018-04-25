@@ -1212,23 +1212,95 @@ trait Strategies
 				DB::enableQueryLog();
 				$knowledge = DB::table('terry_strategy_knowledge')
 					->select(DB::raw('*'))
-					->where('instrument', $pair)
+					->where('instrument', str_replace(['_', '-'], '/', $pair))
 					->where('interval', $interval)
 					->where('percentage_'.$los.'_win', '>=', 70) // successful strats only
 					->where('test_confirmations', '>=', 5) // with enough confirmations to be a valuable stat
-//					->where('candle_strength', '>', 0)
+//					->where('percentage_'.$los.'_win', '>=', 0) // successful strats only
+//					->where('test_confirmations', '>=', 1) // with enough confirmations to be a valuable stat
+					->where('candle_strength', '>', 0)
 					->whereIn('strategy_name', $strategy_names) 
 //					->whereIn('candle_strength', $this->get_candle_strength_range($candle_strengths[$los]))
 					->orderByRaw('indicator_count desc, avg_'.$los.'_profit desc '); //(candle_strength = '.(int)$candle_strengths[$los].') desc, 
 
 
 				$knowledge = $knowledge->get();
-#echo  print_r(DB::getQueryLog(), 1);
+//echo  print_r(DB::getQueryLog(), 1);
 //				file_put_contents('/home/tom/results/wc_experiment_queries', print_r(DB::getQueryLog(), 1), FILE_APPEND);
 				DB::disableQueryLog();
 
 				if(count($knowledge)) {
-					return ['signal' => $los, 'bounds_method'=>$knowledge[0]['bounds_strategy_name'], 'long_matches' => $long_matches];
+					echo 'knowledge rows: ' ;
+//					print_r( $knowledge);
+					return ['signal' => $los, 'bounds_method'=>$knowledge[0]->bounds_strategy_name, 'knowledge_row'=>$knowledge[0]];
+				}
+			}
+		}
+
+		return ['signal' => 'none'];
+	}
+
+	function check_terry_knowledge2($pair, $indicators, $candles, $interval='1m') {
+		$candle_strengths = CandleMap::get_candle_strengths($candles);
+
+		$long_indicators = $short_indicators = [];
+		foreach($indicators as $indicator_name => $indicator_value) {
+			if($indicator_value > 0) {
+				$long_indicators[] = $indicator_name;
+			}
+			else if($indicator_value < 0) {
+				$short_indicators[] = $indicator_name;
+			}
+		}
+
+		foreach(['long', 'short'] as $los) {
+			$indicators = ${$los.'_indicators'};
+			echo $los . ' indicators: '.implode(',',array_values($indicators));
+			echo '.. '.count($indicators).' '.$los.' indicators and '.$los.'  candle strength '.$candle_strengths[$los].'...';
+
+			if(count($indicators) && $candle_strengths[$los] > 0) {
+				sort($indicators);
+				$indicator_combinations = [];
+//				$doubles = [];
+//				$this->combinations($indicators, 2, $doubles);
+//				$triples = [];
+//				$this->combinations($indicators, 3, $triples);
+//				$quadruples = [];
+//				$this->combinations($indicators, 4, $quadruples);
+//				$indicator_combinations = array_merge($doubles, $triples, $quadruples);
+
+				// get strategy names (indicator combs) for IN clause
+				/*(count($indicators) > 4) && */$indicator_combinations[] = $indicators; // add full list, for potential exact match
+				$strategy_names = [];
+				foreach($indicator_combinations as $combination) {
+					sort($combination);
+					$strategy_names[] = 'x_candles__and__'.implode('_', $combination);
+				}
+
+				DB::enableQueryLog();
+				$knowledge = DB::table('terry_strategy_knowledge')
+					->select(DB::raw('*'))
+					->where('instrument', str_replace(['_', '-'], '/', $pair))
+					->where('interval', $interval)
+					->where('percentage_'.$los.'_win', '>=', 70) // successful strats only
+					->where('test_confirmations', '>=', 5) // with enough confirmations to be a valuable stat
+//					->where('percentage_'.$los.'_win', '>=', 0) // successful strats only
+//					->where('test_confirmations', '>=', 1) // with enough confirmations to be a valuable stat
+					->where('candle_strength', '>', 0)
+					->whereIn('strategy_name', $strategy_names) 
+//					->whereIn('candle_strength', $this->get_candle_strength_range($candle_strengths[$los]))
+					->orderByRaw('indicator_count desc, avg_'.$los.'_profit desc '); //(candle_strength = '.(int)$candle_strengths[$los].') desc, 
+
+
+				$knowledge = $knowledge->get();
+//echo  print_r(DB::getQueryLog(), 1);
+//				file_put_contents('/home/tom/results/wc_experiment_queries', print_r(DB::getQueryLog(), 1), FILE_APPEND);
+				DB::disableQueryLog();
+
+				if(count($knowledge)) {
+					echo 'knowledge rows: ' ;
+//					print_r( $knowledge);
+					return ['signal' => $los, 'bounds_method'=>$knowledge[0]->bounds_strategy_name, 'knowledge_row'=>$knowledge[0]];
 				}
 			}
 		}

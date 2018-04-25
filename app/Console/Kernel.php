@@ -36,11 +36,13 @@ class Kernel extends ConsoleKernel
 		Commands\WhaleClubFromTradingViewSignal::class,
 		Commands\BitcoinchartsBackfillCommand::class,
 		Commands\TrainTerryCommand::class,
+		Commands\TrainTerry2Command::class,
 		Commands\WhaleClubExperimentCommand::class,
 		Commands\HistDataBackfillCommand::class,
 //		Commands\EvaluateStrategies2Command::class,
 		Commands\RecordSuccessCommand::class,
 		Commands\ForexTesterBackfillCommand::class,
+                Commands\CheckTerryCommand::class,
     ];
 
     /**

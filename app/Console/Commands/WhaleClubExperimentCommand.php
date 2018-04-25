@@ -82,7 +82,6 @@ class WhaleClubExperimentCommand extends Command {
 		$util = new Util\BrokersUtil();
 		$wc = [];
 		$console = new \Bowhead\Util\Console();
-		$indicators = new \Bowhead\Util\Indicators();
 
 		//$cand = new Util\Candles();
 		$ind = new Util\Indicators();
@@ -168,7 +167,7 @@ class WhaleClubExperimentCommand extends Command {
 					$indicators = $ind->allSignals($instrument, $data);
 
 					echo '.. ask terry..';
-					$result = $this->check_terry_knowledge($instrument, $indicators, $candles, $interval);
+					$result = $this->check_terry_knowledge2($instrument, $indicators, $candles, $interval);
 
 					print_r($result,1);
 
@@ -184,7 +183,7 @@ class WhaleClubExperimentCommand extends Command {
 					}
 
 					if ($direction != 0) {
-						$price = $wc[$instrument]->getPrice(str_replace(['/', '_'], '-', $instrument));
+						$price = $wc[$instrument]->getPrice(str_replace(['_', '/'], '-', $instrument));
 						$current_price = $price['price'];
 
 						if (isset($this->last_order_bounds[$instrument]) && $current_price > $this->last_order_bounds[$instrument][0] && $current_price < $this->last_order_bounds[$instrument][1]) {
