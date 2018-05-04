@@ -49,10 +49,10 @@ class CheckTerryCommand extends Command {
 		$cand = new Util\Candles();
 		$ind = new Util\Indicators();
 
-		$instrument = 'EUR/GBP';
+		$instrument = 'GBP/JPY';
 		$skip_weekends = TRUE;
 		$results_dir = '/home/tom/results';
-		$results_filename = 'terry2';
+		$results_filename = 'terry3_exact_70_jpy';
 		$results = [];
 
 		$strategy_open_position = [];
@@ -62,7 +62,6 @@ class CheckTerryCommand extends Command {
 		$skipped = 0;
 		$end_min = strtotime('2018-01-01 00:00:00');
 		$start_min = strtotime('2017-01-01 00:00:00');
-		$start_min = strtotime('2017-03-23 02:00:00');
 
 		$spread = '0.01'; // fixed for now..
 		$leverage = 222;
@@ -122,7 +121,7 @@ class CheckTerryCommand extends Command {
 				$candles = $this->candle_value($data);
 				$indicator_results = $ind->allSignals($instrument, $data);
 
-				$terry_result = $this->check_terry_knowledge2($instrument, $indicator_results, $candles, $interval);
+				$terry_result = $this->check_terry_knowledge3($instrument, $indicator_results, $candles, $interval);
 
 				$overbought = $underbought = $direction = 0;
 				if ($terry_result['signal'] == 'long') {
@@ -174,7 +173,7 @@ class CheckTerryCommand extends Command {
 						echo "\nLOSE @@@@@@@@@@@@@@@@@@@@ \n";
 					}
 					print_r($result);
-					
+
 					// keep note of end time for this trade.
 					$strategy_open_position[$bounds_strategy_name] = $result['time'];
 

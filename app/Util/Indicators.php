@@ -1184,6 +1184,43 @@ class Indicators
     }
 
 
+	/**
+	 * This will just tell use if the data is/was near fib or demark bounds
+	 */
+	function get_crossed_pivot_boundaries ($pair='BTC/USD', $data=null, $numperiods=false)
+    {
+        if (empty($data)) {
+            $data = $this->getRecentData($pair);
+        }
+		$fibs = $this->calcFibonacci($data);
+		$demark = $this->calcDemark($data);
+		
+        $len = count($data['close']);
+		
+		$boundary_values = array_merge($fibs, $demark);
+		unset($boundary_values['P']);
+		
+		$boundaries_crossed = [];
+
+		foreach($boundary_values as $boundary=>$empty) {
+			$above = $below = FALSE;
+			foreach(['open','high','low','close'] as $fig) {
+				for($a=$len-4;$a<$len;$a++){
+					if($data[$fig][$a] >= $boundary_values[$boundary]) {
+						$above = $above || TRUE;
+					}
+					if($data[$fig][$a] <= $boundary_values[$boundary]) {
+						$below = $below || TRUE;
+					}
+				}
+			}
+			$boundaries_crossed[$boundary] = $above && $below;
+		}
+		
+		return $boundaries_crossed;
+	}
+	
+	
     # TODO
     # trader_wclprice
     #Weighted Close is determined by using High, Low and Closing Price of a Security during one day.

@@ -1240,6 +1240,7 @@ trait Strategies
 		return ['signal' => 'none'];
 	}
 
+	/*use exact indicator match only*/
 	function check_terry_knowledge2($pair, $indicators, $candles, $interval='1m') {
 		$candle_strengths = CandleMap::get_candle_strengths($candles);
 
@@ -1261,16 +1262,7 @@ trait Strategies
 			if(count($indicators) && $candle_strengths[$los] > 0) {
 				sort($indicators);
 				$indicator_combinations = [];
-//				$doubles = [];
-//				$this->combinations($indicators, 2, $doubles);
-//				$triples = [];
-//				$this->combinations($indicators, 3, $triples);
-//				$quadruples = [];
-//				$this->combinations($indicators, 4, $quadruples);
-//				$indicator_combinations = array_merge($doubles, $triples, $quadruples);
-
-				// get strategy names (indicator combs) for IN clause
-				/*(count($indicators) > 4) && */$indicator_combinations[] = $indicators; // add full list, for potential exact match
+				$indicator_combinations[] = $indicators; // add full list, for potential exact match
 				$strategy_names = [];
 				foreach($indicator_combinations as $combination) {
 					sort($combination);
@@ -1308,7 +1300,71 @@ trait Strategies
 		return ['signal' => 'none'];
 	}
 
+	/*use exact indicator match only*/
+	function check_terry_knowledge3($pair, $indicators, $candles, $interval='1m', $long_bounds_methods, $short_bounds_methods) {
+		$candle_strengths = CandleMap::get_candle_strengths($candles);
 
+		$long_indicators = $short_indicators = [];
+		foreach($indicators as $indicator_name => $indicator_value) {
+			if($indicator_value > 0) {
+				$long_indicators[] = $indicator_name;
+			}
+			else if($indicator_value < 0) {
+				$short_indicators[] = $indicator_name;
+			}
+		}
+
+		foreach(['long', 'short'] as $los) {
+			$indicators = ${$los.'_indicators'};
+			$bounds_methods = ${$los.'_bounds_methods'};
+			echo $los . ' indicators: '.implode(',',array_values($indicators));
+			$info = '.. '.count($indicators).' '.$los.' indicators and '.$los.'  candle strength '.$candle_strengths[$los].'...(worthy bounds methods: '.implode(',', $bounds_methods).')';
+			echo $info;
+
+			if(count($indicators) && $candle_strengths[$los] > 0) {
+				sort($indicators);
+				$indicator_combinations = [];
+				// get strategy names (indicator combs) for IN clause
+				$indicator_combinations[] = $indicators; // add full list, for potential exact match
+				$strategy_names = [];
+				foreach($indicator_combinations as $combination) {
+					sort($combination);
+					$strategy_names[] = 'exactmatch: '.implode('_', $combination);
+				}
+
+				DB::enableQueryLog();
+				$knowledge = DB::table('terry_strategy_knowledge')
+					->select(DB::raw('*'))
+					->where('instrument', $pair)
+					->where('interval', $interval)
+					->where('percentage_'.$los.'_win', '>=', 70) // successful strats only
+					->where('test_confirmations', '>=', 5) // with enough confirmations to be a valuable stat
+//					->where('percentage_'.$los.'_win', '>=', 0) // successful strats only
+//					->where('test_confirmations', '>=', 1) // with enough confirmations to be a valuable stat
+					->where('candle_strength', '>', 0)
+					->whereIn('strategy_name', $strategy_names) 
+					->whereIn('bounds_method', $bounds_methods) 
+//					->whereIn('candle_strength', $this->get_candle_strength_range($candle_strengths[$los]))
+					->orderByRaw('avg_'.$los.'_profit desc '); //(candle_strength = '.(int)$candle_strengths[$los].') desc, 
+
+
+				$knowledge = $knowledge->get();
+//echo  print_r(DB::getQueryLog(), 1);
+//				file_put_contents('/home/tom/results/wc_experiment_queries', print_r(DB::getQueryLog(), 1), FILE_APPEND);
+				DB::disableQueryLog();
+
+				if(count($knowledge)) {
+					echo 'knowledge rows: ' ;
+//					print_r( $knowledge);
+					return ['signal' => $los, 'bounds_method'=>$knowledge[0]->bounds_strategy_name, 'knowledge_row'=>$knowledge[0], 'info'=>$info];
+				}
+			}
+		}
+
+		return ['signal' => 'none'];
+	}
+
+	public $bounds_methods = ['perc_10_20', 'perc_20_20', 'perc_30_30', 'perc_30_40', 'perc_40_40', 'fib_r1s1', 'fib_r2s2', 'fib_r3s3', 'demark'];
 	function get_bounds($method, $data, $long, $current_price, $leverage) {
 		switch ($method) {
 			case 'perc_10_20':
@@ -1336,6 +1392,44 @@ trait Strategies
 			default:
 				die('Invalid bounds method ' . $method);
 		}
+	}
+	
+	/**
+	 * Return subset of bounds methods that are actually worth playing babsed on 
+	 * current price, chart data and leverage.
+	 * 
+	 * ... for now use 4% increase/decrease as minimum
+	 */
+	function get_profitable_bounds_methods($current_price, $data, $leverage, $spread, $interval) {
+		$profitable_long_bounds_methods = $profitable_short_bounds_methods = [];
+//		$spread_price_range = (100 + (float)$spread) * $current_price;
+//		
+//		$long_entry = $current_price - $spread_price_range/2;
+//		$short_entry = $current_price + $spread_price_range/2;
+		
+		$min_long_take_profit = $current_price + round(($current_price * (4 / $leverage)) / 100, 5);
+		$max_long_stop_loss = $current_price - round(($current_price * (4 / $leverage)) / 100, 5);
+		$max_short_take_profit = $current_price - round(($current_price * (4 / $leverage)) / 100, 5);
+		$min_short_stop_loss = $current_price + round(($current_price * (4 / $leverage)) / 100, 5);
+		
+		echo "current priec: $current_price \n";
+		foreach($this->bounds_methods as $bounds_method) {
+			echo "bounds method: $bounds_method \n";
+			if ($interval != '1m' && $interval != '5m' && $bounds_method == 'demark') { // only use demark for 1m and 5m
+				continue;
+			}
+			list($stop_loss_long, $take_profit_long) = $this->get_bounds($bounds_method, $data, TRUE, $current_price, $leverage);
+			echo "long stop take: $stop_loss_long, $take_profit_long     range: (".($take_profit_long-$stop_loss_long)." )\n";
+			list($stop_loss_short, $take_profit_short) = $this->get_bounds($bounds_method, $data, FALSE, $current_price, $leverage);
+			echo "short stop take: $stop_loss_short, $take_profit_short      range: (".($stop_loss_short-$take_profit_short)." ) \n";
+			if($take_profit_long > $min_long_take_profit && $stop_loss_long < $max_long_stop_loss) {
+				$profitable_long_bounds_methods[] = $bounds_method;
+			}
+			if($take_profit_short < $max_short_take_profit && $stop_loss_short > $min_short_stop_loss) {
+				$profitable_short_bounds_methods[] = $bounds_method;
+			}
+		}
+		return [$profitable_long_bounds_methods, $profitable_short_bounds_methods];
 	}
 
 	function combinations($arr, $level, &$result, $curr = array()) {

@@ -16,7 +16,7 @@ class CreateTerryStrategyKnowledge extends Migration {
 
 			$table->string('strategy_name', 255)->index('strategy_name1');
 			$table->string('bounds_strategy_name', 255)->index('bounds_strategy_name1');
-			$table->string('instrument', 20)->index('instrument1');
+			$table->string('instrument', 200)->index('instrument1');
 			$table->decimal('percentage_win')->index('percentage_win1');
 			$table->decimal('percentage_long_win')->index('percentage_long_win1');
 			$table->decimal('percentage_short_win')->index('percentage_short_win1');
@@ -33,10 +33,9 @@ class CreateTerryStrategyKnowledge extends Migration {
 			$table->decimal('shorts_per_day', 30, 5)->index('shorts_per_day1');
 			$table->integer('indicator_count')->index('indicator_count1');
 			$table->integer('test_confirmations')->index('test_confirmations1');
-			$table->integer('candle_strength')->index('candle_strength1');
-			$table->enum('interval', ['1m','5m','15m','30m','1h'])->index('interval1');
+			$table->integer('candle_count')->index('candle_count1');
 
-			$table->unique(['strategy_name', 'bounds_strategy_name', 'instrument', 'candle_strength', 'interval'], 'unique_strat_technique');
+			$table->unique(['strategy_name', 'bounds_strategy_name', 'instrument', 'candle_count'], 'unique_strat_technique');
 
 
 
@@ -51,7 +50,7 @@ class CreateTerryStrategyKnowledge extends Migration {
 	 * @return void
 	 */
 	public function down() {
-		Schema::drop('terry_strategy_knowledge');
+		Schema::drop('tom_strategy_knowledge');
 	}
 
 }

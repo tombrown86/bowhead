@@ -35,6 +35,9 @@ trait Pivots
         $data['low']   = array_values($data['low']);
         $data['close'] = array_values($data['close']);
         $num = count($data['high'])-(round($period/2)*2);
+		
+		if($num < 0) $num = 0; // Die or do what we can if insufficient data?
+		
         $ret = [];
         for($a=$num; $a<count($data['high']); $a++) {
             $p = ($data['high'][$a] + $data['low'][$a] + $data['close'][$a])/3;
@@ -75,6 +78,9 @@ trait Pivots
         $data['low']   = array_values($data['low']);
         $data['close'] = array_values($data['close']);
         $num = count($data['high'])-(round($period/2)*2);
+		
+		if($num < 0) $num = 0; // Die or do what we can if insufficient data?
+		
         $ret = [];
         for($a=$num; $a<count($data['high']); $a++) {
             if ($data['close'][$a] < $data['open'][$a]){

@@ -77,8 +77,20 @@ trait OHLC {
 		$low1 = null;
 		$last1timeid = 0;
 		$timeid = date("YmdHi", strtotime($timeid));
-
-		$last1m = \DB::table('bowhead_ohlc_1m')->select(DB::raw('MAX(timeid) AS timeid'))
+		
+		$table = 'bowhead_ohlc_1m';
+		if((int)$timeid < 201802010000) { // (I did some table sharding for my training dataset)
+			if($instrument == 'EUR/USD')
+				$table .= '_eurusd';
+			if($instrument == 'GBP/USD')
+				$table .= '_gbpusd';
+			if($instrument == 'GBP/JPY')
+				$table .= '_gbpjpy';
+			if($instrument == 'EUR/GBP')
+				$table .= '_eurgbp';
+		}
+		
+		$last1m = \DB::table($table)->select(DB::raw('MAX(timeid) AS timeid'))
 				->where('instrument', $instrument)
 				->where('timeid', '<', $timeid)
 				->get();
@@ -443,7 +455,20 @@ trait OHLC {
 		$adjusted_entry = $entry ? ($long ? ($entry / 100) * (100 + ($spread / 2)) : ($entry / 100) * (100 - ($spread / 2))) : NULL;
 		$adjusted_take = $long ? ($take / 100) * (100 + ($spread / 2)) : ($take / 100) * (100 - ($spread / 2));
 		$adjusted_stop = $long ? ($stop / 100) * (100 - ($spread / 2)) : ($stop / 100) * (100 + ($spread / 2));
-		$outcome_resultset = \DB::table('bowhead_ohlc_tick')->select(DB::raw('*'))
+
+		$table = 'bowhead_ohlc_tick';
+		if((int)$time < strtotime('2018-02-01 00:00:00')) { //// (I did some table sharding for my training dataset)
+			if($instrument == 'EUR/USD')
+				$table .= '_eurusd';
+			if($instrument == 'GBP/USD')
+				$table .= '_gbpusd';
+			if($instrument == 'GBP/JPY')
+				$table .= '_gbpjpy';
+			if($instrument == 'EUR/GBP')
+				$table .= '_eurgbp';
+		}
+		
+		$outcome_resultset = \DB::table($table)->select(DB::raw('*'))
 				->where('instrument', $instrument)
 				->where('ctime', '>', date('Y-m-d H:i:s', $time))
 				->where('ctime', '<', date('Y-m-d H:i:s', $etime))
