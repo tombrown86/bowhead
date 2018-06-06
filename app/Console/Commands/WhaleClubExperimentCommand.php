@@ -74,7 +74,7 @@ class WhaleClubExperimentCommand extends Command {
 		echo "PRESS 'q' TO QUIT AND CLOSE ALL POSITIONS\n\n\n";
 		stream_set_blocking(STDIN, 0);
 
-		$instruments = ['GBP_JPY'];
+		$instruments = ['EUR_USD'];
 		$util = new Util\BrokersUtil();
 		$wc = [];
 		$console = new \Bowhead\Util\Console();
@@ -85,8 +85,9 @@ class WhaleClubExperimentCommand extends Command {
 		$this->wc = $wc;
 		$last_candle_times = [];
 		$skipped = 0;
-		$skip_weekends = TRUE;
-		$levereage = 222;
+		$skip_weekends = FALSE;
+		$data_min_datetime = '2018-06-05 15:07:00'; #  '0000-00-00 00:00:00';
+		$leverage = 222;
 		$spread = '0.1';
 
 		foreach ($instruments as $instrument) {
@@ -117,17 +118,26 @@ class WhaleClubExperimentCommand extends Command {
 			foreach (['1m', '5m', '15m', '30m', '1h'] as $interval) {
 				$now = time();
 				$now_date = date('Y-m-d H:i:s', $now);
+
+				$secs_since_min_datetime = strtotime($now_date) - strtotime($data_min_datetime);
 				$secs_since_market_open = $skip_weekends ? ($now - strtotime(date('Y-m-d 22:00:00', date('w', $now) == "0" ? strtotime('today', $now) : strtotime('last Sunday', $now)))) : PHP_INT_MAX;
+				$interval_upper_limit = min($secs_since_market_open, $secs_since_min_datetime);
 
 				echo "-----------------\nInterval $interval (now: $now [$now_date])\n";
 				if ($skip_weekends) {
 					echo "\$secs_since_market_open: $secs_since_market_open\n";
 				}
+				echo "\n\$secs_since_min_datetime: $secs_since_min_datetime (\$data_min_datetime: $data_min_datetime)\n";
+				echo "\n\n\$interval_upper_limit: $interval_upper_limit\n\n";
 
-				list($periods_to_get, $max_period, $max_avg_period, $interval_secs, $min_periods) = Strategies::get_rules_for_interval($interval, $secs_since_market_open);
+				list($periods_to_get, $max_period, $max_avg_period, $interval_secs, $min_periods) = Strategies::get_rules_for_interval($interval, $interval_upper_limit);
 
 				if ($skip_weekends && $periods_to_get < $min_periods) { // make sure there is a long enough range
-					echo "not long enough since weekend for $interval (can only get $periods_to_get periods) and we want at least $min_periods.. \n";
+					echo "not long enough since min date for $interval (can only get $periods_to_get periods) and we want at least $min_periods.. \n";
+					continue;
+				}
+				if(!$periods_to_get) {
+					echo "periods_to_get must be positive ($interval).. \n";
 					continue;
 				}
 
@@ -198,7 +208,7 @@ class WhaleClubExperimentCommand extends Command {
 									echo "$instrument ($interval) at $now [$now_date]:   It's happening, going SHORT..\n";
 
 									$console->buzzer();
-									list($stop_loss, $take_profit) = $this->get_bounds($result['bounds_method'], $data, FALSE, $current_price, $levereage);
+									list($stop_loss, $take_profit) = $this->get_bounds($data, FALSE, $current_price, $levereage, $result['bounds_method']);
 
 									$order = [
 										'direction' => 'short'
@@ -222,7 +232,7 @@ class WhaleClubExperimentCommand extends Command {
 								if ($direction > 0) {
 									echo "$instrument ($interval) at $now [$now_date]:   It's happening, going LONG..\n";
 
-									list($stop_loss, $take_profit) = $this->get_bounds(/* $result['bounds_method'] */'perc_20_20', $data, TRUE, $current_price, $levereage);
+									list($stop_loss, $take_profit) = $this->get_bounds($data, TRUE, $current_price, $levereage, [$result['bounds_method']])[$result['bounds_method']];
 
 									$console->buzzer();
 									$order = [

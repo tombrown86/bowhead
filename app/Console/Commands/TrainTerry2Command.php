@@ -73,11 +73,11 @@ class TrainTerry2Command extends Command {
 		$results_dir = '/home/tom/results';
 
 //		$instrument_set = ['EUR/GBP', 'GBP/JPY', 'EUR/USD', 'GBP/USD', ];
-		$instrument_set = ['EUR/USD'];
+		$instrument_set = ['EUR/GBP'];
 		$instrument_set_str = str_replace('/', '_', implode(',', $instrument_set));
 		
 		$results_filename = $instrument_set_str.'_exactmatches_many_bounds';
-		$results_filename = 'gbpusd_exactmatches_many_bounds';
+		$results_filename = 'eurgbp_exactmatches_many_bounds';
 
 		$results_obj_filename = $results_filename . '_RESULTS_OBJ';
 
@@ -88,12 +88,13 @@ class TrainTerry2Command extends Command {
 		$spread = 0.01; // fixed for now..
 		$leverage = 222;
 		
-//		$results = (array)json_decode(file_get_contents("$results_dir/$results_obj_filename"), TRUE); // (rememeber to update $start_mind !)
+		$results = [];
+		$results = (array)json_decode(file_get_contents("$results_dir/$results_obj_filename"), TRUE); // (rememeber to update $start_mind !)
 		
 		foreach($instrument_set as $instrument){
 			$results = [];
 			$end_min = strtotime('2017-01-01 00:00:00');
-			$start_min = strtotime('2015-01-03 00:00:00');
+			$start_min = strtotime('2016-11-10 00:00:00'); #2016-11-10
 
 			$strategy_open_position = [];
 		
@@ -160,10 +161,10 @@ class TrainTerry2Command extends Command {
 					$indicators_overbought = $indicators_underbought = FALSE;
 
 					foreach ($indicator_results as $indicator => $value) {
-						if ($value > 0) {
+						if ($value > 0 || $value === TRUE) {
 							$underbought_indicators[] = $indicator;
 						}
-						if ($value < 0) {
+						if ($value < 0 || $value === TRUE) {
 							$overbought_indicators[] = $indicator;
 						}
 						if (count($overbought_indicators) > 0) {
@@ -177,8 +178,11 @@ class TrainTerry2Command extends Command {
 					}
 
 					list($profitable_long_bounds_methods, $profitable_short_bounds_methods) = $this->get_profitable_bounds_methods($current_price, $data, $leverage, $spread, $interval);
+					$bounds_methods = array_merge(array_keys($profitable_long_bounds_methods), array_keys($profitable_short_bounds_methods));
 
-					foreach ($indicator_combinations as $overbought_or_underbought => $indicators) { // for terry 2, indicator combinations will only have a size of 1 or 2
+					// TODO: rewrite logic for updated technique! 
+					// slightly hacked for now.. for terry 2, indicator combinations will only have a size of 1 or 2 (for long, short or long and short)
+					foreach ($indicator_combinations as $overbought_or_underbought => $indicators) { 
 						$strategy_name = $interval;
 						foreach ($indicators as $indicator_name) {
 							$strategy_name .= '_' . $indicator_name;
@@ -195,14 +199,8 @@ class TrainTerry2Command extends Command {
 						$overbought = $indicators_overbought && $candle_strengths['short'] != 0;
 						$underbought = $indicators_underbought && $candle_strengths['long'] != 0;
 
-
 						if ($underbought XOR $overbought) {
-//							foreach (['demark', 'fib_r2s2', 'fib_r3s3', 'perc_20_20', 'perc_30_40', 'perc_40_40'/* 'perc_10_20' */] as $bounds_method) {
-							foreach (['demark', 'fib_r2s2', 'fib_r3s3', 'perc_20_20', 'perc_30_40', 'perc_40_40'/* 'perc_10_20' */] as $bounds_method) {
-								if ($interval != '1m' && $interval != '5m' && $bounds_method == 'demark') {
-									// demark algoritm fails with long intervals!  apparently it's no good for them anyway, so skipping rather than trying to resolve it
-									continue;
-								}
+							foreach ($bounds_methods as $bounds_method) {
 								$bounds_strategy_name = "$bounds_method $strategy_name";
 								if ($overbought) {
 									$long = FALSE;
@@ -213,21 +211,25 @@ class TrainTerry2Command extends Command {
 								}
 
 								$endmin = $min + (2 * 60 * 60);
-								list($stop, $take) = $this->get_bounds($bounds_method, $data, $long, $current_price, $leverage);
 
+								// check if bounds were profitable.... if so, get bounds and see if it wins
 								if ($long) {
-									if(!in_array($bounds_method, $profitable_long_bounds_methods)) {
-										echo "\n not profitable bounds method ($bounds_method) ";
+									if(!array_key_exists($bounds_method, $profitable_long_bounds_methods)) {
+										//echo "\n not profitable bounds method ($bounds_method) ";
 										continue;
+									} else {
+										list($stop, $take) = $profitable_long_bounds_methods[$bounds_method];
 									}
 									if (!isset($win_or_lose_long[$bounds_method])) {
 										$win_or_lose_long[$bounds_method] = $this->getWinOrLoose($instrument, $min, $endmin, TRUE, $take, $stop, $current_price, $leverage, $spread);
 									}
 									$result = $win_or_lose_long[$bounds_method];
 								} else {
-									if(!in_array($bounds_method, $profitable_short_bounds_methods)) {
-										echo "\n not profitable bounds method ($bounds_method) ";
+									if(!array_key_exists($bounds_method, $profitable_short_bounds_methods)) {
+										//echo "\n not profitable bounds method ($bounds_method) ";
 										continue;
+									} else {
+										list($stop, $take) = $profitable_short_bounds_methods[$bounds_method];
 									}
 									if (!isset($win_or_lose_short[$bounds_method])) {
 										$win_or_lose_short[$bounds_method] = $this->getWinOrLoose($instrument, $min, $endmin, FALSE, $take, $stop, $current_price, $leverage, $spread);

@@ -182,10 +182,10 @@ class TrainTerryCommand extends Command {
 				// as we go, add specific combinations 
 				$overbought_indicators = $underbought_indicators = [];
 				foreach ($indicator_results as $indicator => $value) {
-					if ($value > 0) {
+					if ($value > 0 || $value === TRUE) {
 						$underbought_indicators[] = $indicator;
 					}
-					if ($value < 0) {
+					if ($value < 0 || $value === TRUE) {
 						$overbought_indicators[] = $indicator;
 					}
 					if (count($overbought_indicators) > 4) {
@@ -246,7 +246,7 @@ class TrainTerryCommand extends Command {
 							}
 
 							$endmin = $min + (2 * 60 * 60);
-							list($stop, $take) = $this->get_bounds($bounds_method, $data, $long, $current_price, $leverage);
+							list($stop, $take) = $this->get_bounds($data, $long, $current_price, $leverage, $bounds_method)[$bounds_method];
 
 							if ($long) {
 								if (!isset($win_or_lose_long[$bounds_method])) {

@@ -148,12 +148,12 @@ class RecordSuccessCommand extends Command {
 
 
 								if (//$candle_value > 0 &&
-										$signal_value > 0 && $indicator_value > 0) {
+										$signal_value > 0 && ($indicator_value === TRUE || $indicator_value > 0)) {
 									//								echo $console->colorize("CREATING A LONG ORDER: $strategy_name\n", 'green');
 									$underbought = 1;
 								}
 								if (//$candle_value < 0 &&
-										$signal_value < 0 && $indicator_value < 0) {
+										$signal_value < 0 && ($indicator_value === TRUE || $indicator_value < 0)) {
 									//								echo $console->colorize("CREATING A SHORT ORDER: $strategy_name\n", 'red');
 									$overbought = 1;
 								}
@@ -167,8 +167,8 @@ class RecordSuccessCommand extends Command {
 									}
 									$endmin = $min + (2 * 60 * 60);
 
-//									$fibs = $this->calcFibonacci([]); // defaults to 'BTC/USD';
-//									$fibs = $this->calcDemark(); // defaults to 'BTC/USD';
+//									$fibs = $this->calc_fib([]); // defaults to 'BTC/USD';
+//									$fibs = $this->calc_demark(); // defaults to 'BTC/USD';
 //									print_r($fibs);die;
 									if($long) {
 										$take = $current_price + (($current_price / 100)*1);

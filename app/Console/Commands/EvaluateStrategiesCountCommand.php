@@ -85,7 +85,7 @@ class EvaluateStrategiesCountCommand extends Command {
 			$underbought = $overbought = 0;
 
 			$data = $this->getRecentData($instrument, 200, false, date('H'), $interval, false, $min, false);
-			if(count($data['periods']) < 200) {
+			if (count($data['periods']) < 200) {
 				$skipped ++;
 				echo "\n !!!!!!!!!!!!!!! Less than 200 periods returned ($min)! \n";
 				continue;
@@ -122,28 +122,28 @@ class EvaluateStrategiesCountCommand extends Command {
 			$indicators = $ind->allSignals('EUR/USD', $data);
 			unset($indicators['ma']); // not needed here.
 //				foreach($trends[$instrument] as $trend_name=>$trend_value) { if($trend_value != 0) {
-			
-			
+
+
 			$win_or_lose_long = NULL;
-			$win_or_lose_short  = NULL;
+			$win_or_lose_short = NULL;
 
 			$count_stats = [];
 
-                        foreach(['indicators'=>$indicators, 'trends'=>$trends['EUR/USD'], 'candles'=>isset($candles['current']) ? $candles['current'] : []] as $typename=>$res) {
+			foreach (['indicators' => $indicators, 'trends' => $trends['EUR/USD'], 'candles' => isset($candles['current']) ? $candles['current'] : []] as $typename => $res) {
 				$cl = $cs = 0;
-				foreach($res as $n=>$v) {
-	                                if($v > 0) {
-                                	        $cl ++;
-                        	        }
-                	                if($v < 0) {
-        	                                $cs ++;
-	                                }
+				foreach ($res as $n => $v) {
+					if ($v === TRUE || $v > 0) {
+						$cl ++;
+					}
+					if ($v === TRUE || $v < 0) {
+						$cs ++;
+					}
 				}
-				foreach(['long', 'short'] as $los) {
-					for($i = 1; $i <= 12; $i++) {
-			                        if($cl >= $i) {
-		        	                        $count_strats['count_'.$los.'_'.$i.'_'.$typename] = $los == 'long' ? 1 : -1;
-		                	        }
+				foreach (['long', 'short'] as $los) {
+					for ($i = 1; $i <= 12; $i++) {
+						if ($cl >= $i) {
+							$count_strats['count_' . $los . '_' . $i . '_' . $typename] = $los == 'long' ? 1 : -1;
+						}
 					}
 				}
 			}
@@ -153,52 +153,56 @@ class EvaluateStrategiesCountCommand extends Command {
 //				foreach ($signals['EUR/USD'] as $signal_name => $signal_value) {
 //					if (isset($candles['current'])) {
 //						foreach ($candles['current'] as $candle_name => $candle_value) {
-						foreach($count_strats as $strategy_name => $value) {
+			foreach ($count_strats as $strategy_name => $value) {
 //							if (isset($signal_name) && isset($indicator_name) && $signal_name == $indicator_name) {
 //								continue;
 //							}
 //							$strategy_name = "$indicator_name" . "_$signal_name"; //. "_$candle_name";
 //								$strategy_name = "$trend_name";
 
-							if (in_array($strategy_name, $strategy_open_position)) {
-								continue;
-							}
+				if (in_array($strategy_name, $strategy_open_position)) {
+					continue;
+				}
 
 
-							$overbought = $underbought = 0;
-							if($value > 0) {$overbought=1;}
-							if($value < 0) {$underbought=1;}
+				$overbought = $underbought = 0;
+				if ($value > 0) {
+					$overbought = 1;
+				}
+				if ($value < 0) {
+					$underbought = 1;
+				}
 
 
-/*							if ($candle_value > 0 &&
-									$signal_value > 0 && $indicator_value > 0) {
-								//								echo $console->colorize("CREATING A LONG ORDER: $strategy_name\n", 'green');
-								$underbought = 1;
-							}
-							if ($candle_value < 0 &&
-									$signal_value < 0 && $indicator_value < 0) {
-								//								echo $console->colorize("CREATING A SHORT ORDER: $strategy_name\n", 'red');
-								$overbought = 1;
-							}
-*/
+				/* 							if ($candle_value > 0 &&
+				  $signal_value > 0 && $indicator_value > 0) {
+				  //								echo $console->colorize("CREATING A LONG ORDER: $strategy_name\n", 'green');
+				  $underbought = 1;
+				  }
+				  if ($candle_value < 0 &&
+				  $signal_value < 0 && $indicator_value < 0) {
+				  //								echo $console->colorize("CREATING A SHORT ORDER: $strategy_name\n", 'red');
+				  $overbought = 1;
+				  }
+				 */
 
-							if ($overbought || $underbought) {
-								if ($overbought) {
-									$long = false;
-								} else if ($underbought) {
-									$long = true;
-								}
-								$endmin = $min + (2 * 60 * 60);
+				if ($overbought || $underbought) {
+					if ($overbought) {
+						$long = false;
+					} else if ($underbought) {
+						$long = true;
+					}
+					$endmin = $min + (2 * 60 * 60);
 
-								$fibs = $this->calcFibonacci($data); // defaults to 'EUR/USD';
-								if ($long) {
-									$take = $fibs['R2'];
-									$stop = $fibs['S2'];
-								} else {
-									$take = $fibs['S2'];
-									$stop = $fibs['R2'];
-								}
-//									$fibs = $this->calcDemark(); // defaults to 'EUR/USD';
+					$fibs = $this->calc_fib($data); // defaults to 'EUR/USD';
+					if ($long) {
+						$take = $fibs['R2'];
+						$stop = $fibs['S2'];
+					} else {
+						$take = $fibs['S2'];
+						$stop = $fibs['R2'];
+					}
+//									$fibs = $this->calc_demark(); // defaults to 'EUR/USD';
 //									print_r($fibs);die;
 //									if($long) {
 //										$take = $current_price + (($current_price / 100)*1);
@@ -208,47 +212,47 @@ class EvaluateStrategiesCountCommand extends Command {
 //										$stop   = $current_price - (($current_price / 100)*1);
 //									}
 
-								if($long) {
-									if(!$win_or_lose_long) {
-										$win_or_lose_long = $this->getWinOrLoose('EUR/USD', $min, $endmin, TRUE, $take, $stop);
-									}
-									$result = $win_or_lose_long;
-								} else {
-									if(!$win_or_lose_short) {
-										$win_or_lose_short = $this->getWinOrLoose('EUR/USD', $min, $endmin, FALSE, $take, $stop);
-									}
-									$result = $win_or_lose_short;
-								}
+					if ($long) {
+						if (!$win_or_lose_long) {
+							$win_or_lose_long = $this->getWinOrLoose('EUR/USD', $min, $endmin, TRUE, $take, $stop);
+						}
+						$result = $win_or_lose_long;
+					} else {
+						if (!$win_or_lose_short) {
+							$win_or_lose_short = $this->getWinOrLoose('EUR/USD', $min, $endmin, FALSE, $take, $stop);
+						}
+						$result = $win_or_lose_short;
+					}
 
-								// keep note of end time for this trade.
-								$strategy_open_position[$strategy_name] = $result['time'];
+					// keep note of end time for this trade.
+					$strategy_open_position[$strategy_name] = $result['time'];
 
-								if (!isset($results[$strategy_name])) {
-									$results[$strategy_name] = [
-										'long_wins' => 0,
-										'short_wins' => 0,
-										'long_loses' => 0,
-										'short_loses' => 0,
-										'timeout_loses' => 0,
-										'wins_plus_loses' => 0,
-										'positions_count' => 0,
-										'total_longs' => 0,
-										'total_shorts' => 0,
-										'total_wins' => 0,
-										'total_loses' => 0,
-										'long_correct_trend' => [],
-										'long_wrong_trend' => [],
+					if (!isset($results[$strategy_name])) {
+						$results[$strategy_name] = [
+							'long_wins' => 0,
+							'short_wins' => 0,
+							'long_loses' => 0,
+							'short_loses' => 0,
+							'timeout_loses' => 0,
+							'wins_plus_loses' => 0,
+							'positions_count' => 0,
+							'total_longs' => 0,
+							'total_shorts' => 0,
+							'total_wins' => 0,
+							'total_loses' => 0,
+							'long_correct_trend' => [],
+							'long_wrong_trend' => [],
 //                                                                                        'long_correct_candle' => [],
 //                                                                                        'long_wrong_candle' => [],
-										'short_correct_trend' => [],
-										'short_wrong_trend' => [],
+							'short_correct_trend' => [],
+							'short_wrong_trend' => [],
 //                                                                                        'short_correct_candle' => [],
 //                                                                                        'short_wrong_candle' => [],
-										'% win' => 0,
-									];
-								}
+							'% win' => 0,
+						];
+					}
 
-								$prefix = $long ? 'long_' : 'short';
+					$prefix = $long ? 'long_' : 'short';
 //										if(isset($candles['current'])) {
 //											foreach ($candles['current'] as $candle_name => $candle_value) {
 //												if(($candle_value > 0 && $result['win']) || ($candle_value < 0 && !$result['win'])) {
@@ -268,38 +272,38 @@ class EvaluateStrategiesCountCommand extends Command {
 //												}
 //											}										
 //										}
-								foreach ($trends[$instrument] as $trend_name => $trend_value) {
-									if ($trend_value != 0) {
-										if (($trend_value > 0 && $result['win']) || ($trend_value < 0 && !$result['win'])) {
-											if (!isset($results[$strategy_name][$prefix . 'correct_trend'][$trend_name])) {
-												$results[$strategy_name][$prefix . 'correct_trend'][$trend_name] = 1;
-											} else {
-												$results[$strategy_name][$prefix . 'correct_trend'][$trend_name];
-											}
-										}
-										if (($trend_value > 0 && !$result['win']) || ($trend_value < 0 && $result['win'])) {
-											if (!isset($results[$strategy_name][$prefix . 'wrong_trend'][$trend_name])) {
-												$results[$strategy_name][$prefix . 'wrong_trend'][$trend_name] = 1;
-											} else {
-												$results[$strategy_name][$prefix . 'wrong_trend'][$trend_name] ++;
-											}
-										}
-									}
+					foreach ($trends[$instrument] as $trend_name => $trend_value) {
+						if ($trend_value != 0) {
+							if (($trend_value > 0 && $result['win']) || ($trend_value < 0 && !$result['win'])) {
+								if (!isset($results[$strategy_name][$prefix . 'correct_trend'][$trend_name])) {
+									$results[$strategy_name][$prefix . 'correct_trend'][$trend_name] = 1;
+								} else {
+									$results[$strategy_name][$prefix . 'correct_trend'][$trend_name];
 								}
-
-								$results[$strategy_name]['positions_count'] ++;
-
-								$result['win'] ? $results[$strategy_name][($long ? 'long_' : 'short_') . 'wins'] ++ : $results[$strategy_name][($long ? 'long_' : 'short_') . 'loses'] ++;
-								$result['win'] ? $results[$strategy_name]['total_wins'] ++ : $results[$strategy_name]['total_loses'] ++;
-								$long ? $results[$strategy_name]['total_longs'] ++ : $results[$strategy_name]['total_shorts'] ++;
-								if ($result['time'] == $endmin) {
-									$results[$strategy_name]['timeout_loses'] ++;
+							}
+							if (($trend_value > 0 && !$result['win']) || ($trend_value < 0 && $result['win'])) {
+								if (!isset($results[$strategy_name][$prefix . 'wrong_trend'][$trend_name])) {
+									$results[$strategy_name][$prefix . 'wrong_trend'][$trend_name] = 1;
+								} else {
+									$results[$strategy_name][$prefix . 'wrong_trend'][$trend_name] ++;
 								}
-								$results[$strategy_name]['wins_plus_loses'] += $result['win'] ? 1 : -1;
+							}
+						}
+					}
+
+					$results[$strategy_name]['positions_count'] ++;
+
+					$result['win'] ? $results[$strategy_name][($long ? 'long_' : 'short_') . 'wins'] ++ : $results[$strategy_name][($long ? 'long_' : 'short_') . 'loses'] ++;
+					$result['win'] ? $results[$strategy_name]['total_wins'] ++ : $results[$strategy_name]['total_loses'] ++;
+					$long ? $results[$strategy_name]['total_longs'] ++ : $results[$strategy_name]['total_shorts'] ++;
+					if ($result['time'] == $endmin) {
+						$results[$strategy_name]['timeout_loses'] ++;
+					}
+					$results[$strategy_name]['wins_plus_loses'] += $result['win'] ? 1 : -1;
 
 //								}
 //							}
-							}
+				}
 //						}
 //					}
 //				}}

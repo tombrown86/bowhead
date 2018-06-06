@@ -1178,10 +1178,10 @@ trait Strategies
 
 		$long_indicators = $short_indicators = [];
 		foreach($indicators as $indicator_name => $indicator_value) {
-			if($indicator_value > 0) {
+			if($indicator_value === TRUE || $indicator_value > 0) {
 				$long_indicators[] = $indicator_name;
 			}
-			else if($indicator_value < 0) {
+			else if($indicator_value === TRUE || $indicator_value < 0) {
 				$short_indicators[] = $indicator_name;
 			}
 		}
@@ -1246,10 +1246,10 @@ trait Strategies
 
 		$long_indicators = $short_indicators = [];
 		foreach($indicators as $indicator_name => $indicator_value) {
-			if($indicator_value > 0) {
+			if($indicator_value === TRUE || $indicator_value > 0) {
 				$long_indicators[] = $indicator_name;
 			}
-			else if($indicator_value < 0) {
+			else if($indicator_value === TRUE || $indicator_value < 0) {
 				$short_indicators[] = $indicator_name;
 			}
 		}
@@ -1272,7 +1272,7 @@ trait Strategies
 				DB::enableQueryLog();
 				$knowledge = DB::table('terry_strategy_knowledge')
 					->select(DB::raw('*'))
-					->where('instrument', str_replace(['_', '-'], '/', $pair))
+					->where('instrument', str_replace(['/', '-'], '_', $pair))
 					->where('interval', $interval)
 					->where('percentage_'.$los.'_win', '>=', 70) // successful strats only
 					->where('test_confirmations', '>=', 5) // with enough confirmations to be a valuable stat
@@ -1306,17 +1306,17 @@ trait Strategies
 
 		$long_indicators = $short_indicators = [];
 		foreach($indicators as $indicator_name => $indicator_value) {
-			if($indicator_value > 0) {
+			if($indicator_value === TRUE || $indicator_value > 0) {
 				$long_indicators[] = $indicator_name;
 			}
-			else if($indicator_value < 0) {
+			else if($indicator_value === TRUE || $indicator_value < 0) {
 				$short_indicators[] = $indicator_name;
 			}
 		}
 
 		foreach(['long', 'short'] as $los) {
 			$indicators = ${$los.'_indicators'};
-			$bounds_methods = ${$los.'_bounds_methods'};
+			$bounds_methods = array_keys(${$los.'_bounds_methods'});
 			echo $los . ' indicators: '.implode(',',array_values($indicators));
 			$info = '.. '.count($indicators).' '.$los.' indicators and '.$los.'  candle strength '.$candle_strengths[$los].'...(worthy bounds methods: '.implode(',', $bounds_methods).')';
 			echo $info;
@@ -1332,7 +1332,7 @@ trait Strategies
 					$strategy_names[] = 'exactmatch: '.implode('_', $combination);
 				}
 
-				DB::enableQueryLog();
+//				DB::enableQueryLog();
 				$knowledge = DB::table('terry_strategy_knowledge')
 					->select(DB::raw('*'))
 					->where('instrument', $pair)
@@ -1343,7 +1343,7 @@ trait Strategies
 //					->where('test_confirmations', '>=', 1) // with enough confirmations to be a valuable stat
 					->where('candle_strength', '>', 0)
 					->whereIn('strategy_name', $strategy_names) 
-					->whereIn('bounds_method', $bounds_methods) 
+					->whereIn('bounds_strategy_name', $bounds_methods) 
 //					->whereIn('candle_strength', $this->get_candle_strength_range($candle_strengths[$los]))
 					->orderByRaw('avg_'.$los.'_profit desc '); //(candle_strength = '.(int)$candle_strengths[$los].') desc, 
 
@@ -1351,7 +1351,7 @@ trait Strategies
 				$knowledge = $knowledge->get();
 //echo  print_r(DB::getQueryLog(), 1);
 //				file_put_contents('/home/tom/results/wc_experiment_queries', print_r(DB::getQueryLog(), 1), FILE_APPEND);
-				DB::disableQueryLog();
+//				DB::disableQueryLog();
 
 				if(count($knowledge)) {
 					echo 'knowledge rows: ' ;
@@ -1364,34 +1364,73 @@ trait Strategies
 		return ['signal' => 'none'];
 	}
 
-	public $bounds_methods = ['perc_10_20', 'perc_20_20', 'perc_30_30', 'perc_30_40', 'perc_40_40', 'fib_r1s1', 'fib_r2s2', 'fib_r3s3', 'demark'];
-	function get_bounds($method, $data, $long, $current_price, $leverage) {
-		switch ($method) {
-			case 'perc_10_20':
-				return $long ? [$current_price - round(($current_price * (10 / $leverage)) / 100, 5), $current_price + round(($current_price * (20 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (10 / $leverage)) / 100, 5), $current_price - round(($current_price * (20 / $leverage)) / 100, 5)];
-			case 'perc_20_20':
-				return $long ? [$current_price - round(($current_price * (20 / $leverage)) / 100, 5), $current_price + round(($current_price * (20 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (20 / $leverage)) / 100, 5), $current_price - round(($current_price * (20 / $leverage)) / 100, 5)];
-			case 'perc_30_30':
-				return $long ? [$current_price - round(($current_price * (30 / $leverage)) / 100, 5), $current_price + round(($current_price * (30 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (30 / $leverage)) / 100, 5), $current_price - round(($current_price * (30 / $leverage)) / 100, 5)];
-			case 'perc_30_40':
-				return $long ? [$current_price - round(($current_price * (30 / $leverage)) / 100, 5), $current_price + round(($current_price * (40 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (30 / $leverage)) / 100, 5), $current_price - round(($current_price * (40 / $leverage)) / 100, 5)];
-			case 'perc_40_40':
-				return $long ? [$current_price - round(($current_price * (40 / $leverage)) / 100, 5), $current_price + round(($current_price * (40 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (40 / $leverage)) / 100, 5), $current_price - round(($current_price * (40 / $leverage)) / 100, 5)];
-			case 'fib_r1s1':
-				$fibs = $this->calcFibonacci($data);
-				return $long ? [$fibs['S1'], $fibs['R1']] : [$fibs['R1'], $fibs['S1']];
-			case 'fib_r2s2':
-				$fibs = $this->calcFibonacci($data);
-				return $long ? [$fibs['S2'], $fibs['R2']] : [$fibs['R2'], $fibs['S2']];
-			case 'fib_r3s3':
-				$fibs = $this->calcFibonacci($data);
-				return $long ? [$fibs['S3'], $fibs['R3']] : [$fibs['R3'], $fibs['S3']];
-			case 'demark':
-				$demark = $this->calcDemark($data);
-				return $long ? [$demark['S1'], $demark['R1']] : [$demark['R1'], $demark['S1']];
-			default:
-				die('Invalid bounds method ' . $method);
+	/**
+	 * Get stop/take trade bounds from data based on various methods.
+	 * Will return array of all those listed in $methods, or ALL by default. 
+	 * Or if methods is a string defining a single method, the bounds for that single method will be returned.
+	 */
+	function get_bounds($data, $long, $current_price, $leverage, $methods=NULL) {
+		$ret = [];
+		$methods_arr = (array)$methods;
+
+		// fixed % profit / loss
+		if($methods == NULL || in_array('10%_20%', $methods_arr))
+			$ret['10%_20%'] = $long ? [$current_price - round(($current_price * (10 / $leverage)) / 100, 5), $current_price + round(($current_price * (20 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (10 / $leverage)) / 100, 5), $current_price - round(($current_price * (20 / $leverage)) / 100, 5)];
+		if($methods == NULL || in_array('20%_20%', $methods_arr))
+			$ret['20%_20%'] = $long ? [$current_price - round(($current_price * (20 / $leverage)) / 100, 5), $current_price + round(($current_price * (20 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (20 / $leverage)) / 100, 5), $current_price - round(($current_price * (20 / $leverage)) / 100, 5)];
+		if($methods == NULL || in_array('30%_30%', $methods_arr))
+			$ret['30%_30%'] = $long ? [$current_price - round(($current_price * (30 / $leverage)) / 100, 5), $current_price + round(($current_price * (30 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (30 / $leverage)) / 100, 5), $current_price - round(($current_price * (30 / $leverage)) / 100, 5)];
+		if($methods == NULL || in_array('30%_40%', $methods_arr))
+			$ret['30%_40%'] = $long ? [$current_price - round(($current_price * (30 / $leverage)) / 100, 5), $current_price + round(($current_price * (40 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (30 / $leverage)) / 100, 5), $current_price - round(($current_price * (40 / $leverage)) / 100, 5)];
+		if($methods == NULL || in_array('40%_40%', $methods_arr))
+			$ret['40%_40%'] = $long ? [$current_price - round(($current_price * (40 / $leverage)) / 100, 5), $current_price + round(($current_price * (40 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (40 / $leverage)) / 100, 5), $current_price - round(($current_price * (40 / $leverage)) / 100, 5)];
+		
+
+
+		// loop thru pivot types + all of their levels (E.g. R1 S1 up to R3 S3 for fib)
+		foreach(['fib'=>3, 'pivot'=>2, 'demark'=>1] as $technique=>$no_of_levels) {
+			for($level=1; $level<=$no_of_levels; $level++) {
+				// simple upper lower bounds based on levels
+				$bounds_method = $technique . '_R'.$level.'_S'.$level;
+				if($methods == NULL || in_array($bounds_method, $methods_arr)) {
+					isset($$technique) or $$technique = $this->{'calc_'.$technique}($data); // get data for pivot technique if not got it already
+					
+					$ret[$bounds_method] = [NULL, NULL];  // E.g. $ret['fib_R2_S2'] = [NULL, NULL];
+					if($$technique !== FALSE) {
+						//E.g.	$ret['fib_R2_S2'] = return $long ? [$fib['S2'], $fib['R2']] : [$fib['R2'], $fib['S2']];
+						$ret[$bounds_method] = $long ? [$$technique["S$level"], $$technique["R$level"]] : [$$technique["R$level"], $$technique["S$level"]];
+					}
+				}
+				
+				// perc one way, support or resistance level the other
+				foreach(['2', '4', '8', '12', '20'] as $perc) {
+					$perc_up_price = $current_price + round(($current_price * ($perc / $leverage)) / 100, 5);
+					$perc_down_price = $current_price - round(($current_price * ($perc / $leverage)) / 100, 5);
+					
+					$bounds_method = $technique . '_'.$perc.'%_S'.$level;
+					if($methods == NULL || in_array($bounds_method, $methods_arr)) {
+						isset($$technique) or $$technique = $this->{'calc_'.$technique}($data); // get data for pivot technique if not got it already
+						
+						$ret[$bounds_method] = [NULL, NULL]; 
+						if($$technique !== FALSE) {
+							$ret[$bounds_method] = $long ? [$perc_down_price, $$technique["R$level"]] : [$$technique["R$level"], $perc_down_price];
+						}
+					}
+					
+					$bounds_method = $technique . '_R'.$level.'_'.$perc.'%';
+					if($methods == NULL || in_array($bounds_method, $methods_arr)) {
+						isset($$technique) or $$technique = $this->{'calc_'.$technique}($data); // get data for pivot technique if not got it already
+						
+						$ret[$bounds_method] = [NULL, NULL]; 
+						if(isset($$technique)) {
+							$ret[$bounds_method] = $long ? [$$technique["S$level"], $perc_up_price] : [$perc_up_price, $$technique["S$level"]];
+						}
+					}
+				}
+			}
 		}
+		
+		return gettype($methods) == 'string' ?  array_pop($ret) : $ret;
 	}
 	
 	/**
@@ -1412,21 +1451,19 @@ trait Strategies
 		$max_short_take_profit = $current_price - round(($current_price * (4 / $leverage)) / 100, 5);
 		$min_short_stop_loss = $current_price + round(($current_price * (4 / $leverage)) / 100, 5);
 		
-		echo "current priec: $current_price \n";
-		foreach($this->bounds_methods as $bounds_method) {
-			echo "bounds method: $bounds_method \n";
-			if ($interval != '1m' && $interval != '5m' && $bounds_method == 'demark') { // only use demark for 1m and 5m
-				continue;
-			}
-			list($stop_loss_long, $take_profit_long) = $this->get_bounds($bounds_method, $data, TRUE, $current_price, $leverage);
-			echo "long stop take: $stop_loss_long, $take_profit_long     range: (".($take_profit_long-$stop_loss_long)." )\n";
-			list($stop_loss_short, $take_profit_short) = $this->get_bounds($bounds_method, $data, FALSE, $current_price, $leverage);
-			echo "short stop take: $stop_loss_short, $take_profit_short      range: (".($stop_loss_short-$take_profit_short)." ) \n";
+		echo "current price: $current_price \n";
+		foreach($this->get_bounds($data, TRUE, $current_price, $leverage) as $bounds_method=>$bounds) {
+			list($stop_loss_long, $take_profit_long) = $bounds;
+			echo "\nbounds method: $bounds_method...  long stop take: $stop_loss_long, $take_profit_long     range: (".($take_profit_long-$stop_loss_long)." )\n";
 			if($take_profit_long > $min_long_take_profit && $stop_loss_long < $max_long_stop_loss) {
-				$profitable_long_bounds_methods[] = $bounds_method;
+				$profitable_long_bounds_methods[$bounds_method] = $bounds;
 			}
+		}
+		foreach($this->get_bounds($data, FALSE, $current_price, $leverage) as $bounds_method=>$bounds) {
+			list($stop_loss_short, $take_profit_short) = $bounds;
+			echo "\nbounds method: $bounds_method...  short stop take: $stop_loss_short, $take_profit_short      range: (".($stop_loss_short-$take_profit_short)." ) \n";
 			if($take_profit_short < $max_short_take_profit && $stop_loss_short > $min_short_stop_loss) {
-				$profitable_short_bounds_methods[] = $bounds_method;
+				$profitable_short_bounds_methods[$bounds_method] = $bounds; 
 			}
 		}
 		return [$profitable_long_bounds_methods, $profitable_short_bounds_methods];
@@ -1449,41 +1486,41 @@ trait Strategies
 
 
 	static function get_rules_for_interval($interval, $secs_since_market_open=PHP_INT_MAX) {
-                               if ($interval == '1m') {
-                                       $periods_to_get = min(floor($secs_since_market_open / 60) - 50, 365);
-                                       $max_period = 60 * 8;
-                                       $max_avg_period = 80;
-                                       $interval_secs = 60;
-                                       $min_periods = 300;
-                               }
-                               if ($interval == '5m') {
-                                       $periods_to_get = min(floor($secs_since_market_open / (60 * 5)) - 25, 365);
-                                       $max_period = 60 * 25;
-                                       $max_avg_period = 60 * 8;
-                                       $interval_secs = 5 * 60;
-                                       $min_periods = 120;
-                               }
-                               if ($interval == '15m') {
-                                       $periods_to_get = min(floor($secs_since_market_open / (60 * 15)) - 8, 365);
-                                       $max_period = 60 * 25;
-                                       $max_avg_period = 60 * 20;
-                                       $interval_secs = 15 * 60;
-                                       $min_periods = 50;
-                               }
-                               if ($interval == '30m') {
-                                       $periods_to_get = min(floor($secs_since_market_open / (60 * 30)) - 4, 365);
-                                       $max_period = 60 * 50;
-                                       $max_avg_period = 60 * 40;
-                                       $interval_secs = 30 * 60;
-                                       $min_periods = 50;
-                               }
-                               if ($interval == '1h') {
-                                       $periods_to_get = min(floor($secs_since_market_open / (60 * 60)), 365 - 2);
-                                       $max_period = 60 * 120;
-                                       $max_avg_period = 60 * 70;
-                                       $interval_secs = 60 * 60;
-                                       $min_periods = 40;
-                               }
+		if ($interval == '1m') {
+				$periods_to_get = min(floor($secs_since_market_open / 60) - 50, 365);
+				$max_period = 60 * 8;
+				$max_avg_period = 80;
+				$interval_secs = 60;
+				$min_periods = 300;
+		}
+		if ($interval == '5m') {
+				$periods_to_get = min(floor($secs_since_market_open / (60 * 5)) - 25, 365);
+				$max_period = 60 * 25;
+				$max_avg_period = 60 * 8;
+				$interval_secs = 5 * 60;
+				$min_periods = 120;
+		}
+		if ($interval == '15m') {
+				$periods_to_get = min(floor($secs_since_market_open / (60 * 15)) - 8, 365);
+				$max_period = 60 * 25;
+				$max_avg_period = 60 * 20;
+				$interval_secs = 15 * 60;
+				$min_periods = 50;
+		}
+		if ($interval == '30m') {
+				$periods_to_get = min(floor($secs_since_market_open / (60 * 30)) - 4, 365);
+				$max_period = 60 * 50;
+				$max_avg_period = 60 * 40;
+				$interval_secs = 30 * 60;
+				$min_periods = 50;
+		}
+		if ($interval == '1h') {
+				$periods_to_get = min(floor($secs_since_market_open / (60 * 60)), 365 - 2);
+				$max_period = 60 * 120;
+				$max_avg_period = 60 * 70;
+				$interval_secs = 60 * 60;
+				$min_periods = 40;
+		}
 		return [$periods_to_get, $max_period, $max_avg_period, $interval_secs, $min_periods];
 	}
 

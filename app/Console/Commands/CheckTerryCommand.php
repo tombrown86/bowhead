@@ -49,10 +49,10 @@ class CheckTerryCommand extends Command {
 		$cand = new Util\Candles();
 		$ind = new Util\Indicators();
 
-		$instrument = 'GBP/JPY';
+		$instrument = 'EUR/USD';
 		$skip_weekends = TRUE;
 		$results_dir = '/home/tom/results';
-		$results_filename = 'terry3_exact_70_jpy';
+		$results_filename = 'terry3_exact_eurusd';
 		$results = [];
 
 		$strategy_open_position = [];
@@ -61,7 +61,7 @@ class CheckTerryCommand extends Command {
 
 		$skipped = 0;
 		$end_min = strtotime('2018-01-01 00:00:00');
-		$start_min = strtotime('2017-01-01 00:00:00');
+		$start_min = strtotime('2017-01-04 00:00:00');
 
 		$spread = '0.01'; // fixed for now..
 		$leverage = 222;
@@ -121,16 +121,21 @@ class CheckTerryCommand extends Command {
 				$candles = $this->candle_value($data);
 				$indicator_results = $ind->allSignals($instrument, $data);
 
-				$terry_result = $this->check_terry_knowledge3($instrument, $indicator_results, $candles, $interval);
+				list($profitable_long_bounds_methods, $profitable_short_bounds_methods) = $this->get_profitable_bounds_methods($current_price, $data, $leverage, $spread, $interval);
+				$terry_result = $this->check_terry_knowledge3(str_replace(['/', '-'], '_', $instrument), $indicator_results, $candles, $interval, $profitable_long_bounds_methods, $profitable_short_bounds_methods);
+				//print_r($terry_result);
 
 				$overbought = $underbought = $direction = 0;
 				if ($terry_result['signal'] == 'long') {
 					$direction = 1;
-					echo "$instrument ($interval): Found long signal... " ;//. print_r($terry_result, 1);
+					echo "$instrument ($interval): Found long signal... " ;
+					//print_r($terry_result, 1);die;
 					$underbought = 1;
 				} elseif ($terry_result['signal'] == 'short') {
 					$direction = -1;
 					echo "$instrument ($interval): Found short signal... " ;//. print_r($terry_result, 1);
+                                        //print_r($terry_result, 1);die;
+
 					$overbought = 1;
 				} else {
 					echo '..no action' . "\n";
@@ -153,7 +158,7 @@ class CheckTerryCommand extends Command {
 					}
 
 					$endmin = $min + (2 * 60 * 60);
-					list($stop, $take) = $this->get_bounds($terry_result['bounds_method'], $data, $long, $current_price, $leverage);
+					list($stop, $take) = $this->get_bounds($data, $long, $current_price, $leverage, $terry_result['bounds_method']);
 
 					if ($long) {
 						if (!isset($win_or_lose_long[$terry_result['bounds_method']])) {

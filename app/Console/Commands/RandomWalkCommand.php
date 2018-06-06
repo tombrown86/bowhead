@@ -137,7 +137,7 @@ class RandomWalkCommand extends Command {
         $price = $wc->getPrice(str_replace('_','-',$instrument));
         $price = $price['price'];
 
-        $fibs = $this->calcFibonacci([]); // defaults to 'BTC/USD';
+        $fibs = $this->calc_fib([]); // defaults to 'BTC/USD';
         $amt_takeprofit = $fibs['R3']+15;
         $amt_stoploss   = $fibs['S2']-10;
 
@@ -246,12 +246,12 @@ class RandomWalkCommand extends Command {
                             continue;
                         }
                         $strategy_name = "$indicator_name". "_$signal_name" . "_$candle_name";
-                        if ($candle_value > 0 && $signal_value > 0 && $indicator_value > 0) {
+                        if ($candle_value > 0 && $signal_value > 0 && ($indicator_value === TRUE || $indicator_value > 0)) {
                             echo $console->colorize("CREATING A LONG ORDER: $strategy_name\n", 'green');
                             // do a buy here.
                             $this->createPosition('BTC-USD', 'long', $strategy_name, 0, 0, 0.1, 10);
                         }
-                        if ($candle_value < 0 && $signal_value < 0 && $indicator_value < 0) {
+                        if ($candle_value < 0 && $signal_value < 0 && ($indicator_value === TRUE || $indicator_value < 0)) {
                             echo $console->colorize("CREATING A SHORT ORDER: $strategy_name\n", 'red');
                             // do a short here.
                             $this->createPosition('BTC-USD', 'short', $strategy_name, 0, 0, 0.1, 10);

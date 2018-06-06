@@ -37,7 +37,7 @@ use Symfony\Component\Process\Exception\ProcessFailedException;
  */
 class Indicators
 {
-    use OHLC;
+    use OHLC, \Bowhead\Traits\Pivots;
     /**
      * @var array
      *      array with the available types of moving averages
@@ -1183,42 +1183,7 @@ class Indicators
         return 0; // we are cycling.
     }
 
-
-	/**
-	 * This will just tell use if the data is/was near fib or demark bounds
-	 */
-	function get_crossed_pivot_boundaries ($pair='BTC/USD', $data=null, $numperiods=false)
-    {
-        if (empty($data)) {
-            $data = $this->getRecentData($pair);
-        }
-		$fibs = $this->calcFibonacci($data);
-		$demark = $this->calcDemark($data);
-		
-        $len = count($data['close']);
-		
-		$boundary_values = array_merge($fibs, $demark);
-		unset($boundary_values['P']);
-		
-		$boundaries_crossed = [];
-
-		foreach($boundary_values as $boundary=>$empty) {
-			$above = $below = FALSE;
-			foreach(['open','high','low','close'] as $fig) {
-				for($a=$len-4;$a<$len;$a++){
-					if($data[$fig][$a] >= $boundary_values[$boundary]) {
-						$above = $above || TRUE;
-					}
-					if($data[$fig][$a] <= $boundary_values[$boundary]) {
-						$below = $below || TRUE;
-					}
-				}
-			}
-			$boundaries_crossed[$boundary] = $above && $below;
-		}
-		
-		return $boundaries_crossed;
-	}
+	
 	
 	
     # TODO
@@ -1243,10 +1208,11 @@ class Indicators
      */
 
     /**
+	 * 
      * @param string $pair
      * @param null   $data
      *
-     * @return mixed
+     * @return mixed 
      */
     public function allSignals($pair='BTC/USD', $data=null)
     {
@@ -1286,7 +1252,13 @@ class Indicators
                 }
             }
         }
-
+/*
+		// append crossed pivot boundaries
+		$crossed_boundaries = $this->get_crossed_pivot_boundaries($data);
+		foreach($crossed_boundaries as $boundary=>$was_crossed) {
+			$flags[$boundary.'_crossed'] = $was_crossed;
+		}
+*/
         return $flags;
     }
 
