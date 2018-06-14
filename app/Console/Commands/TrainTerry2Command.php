@@ -73,11 +73,10 @@ class TrainTerry2Command extends Command {
 		$results_dir = '/home/tom/results';
 
 //		$instrument_set = ['EUR/GBP', 'GBP/JPY', 'EUR/USD', 'GBP/USD', ];
-		$instrument_set = ['EUR/GBP'];
+		$instrument_set = ['EUR/USD'];
 		$instrument_set_str = str_replace('/', '_', implode(',', $instrument_set));
 		
 		$results_filename = $instrument_set_str.'_exactmatches_many_bounds';
-		$results_filename = 'eurgbp_exactmatches_many_bounds';
 
 		$results_obj_filename = $results_filename . '_RESULTS_OBJ';
 
@@ -94,7 +93,7 @@ class TrainTerry2Command extends Command {
 		foreach($instrument_set as $instrument){
 			$results = [];
 			$end_min = strtotime('2017-01-01 00:00:00');
-			$start_min = strtotime('2016-11-10 00:00:00'); #2016-11-10
+			$start_min = strtotime('2016-04-14');#2015-01-03 00:00:00'); 
 
 			$strategy_open_position = [];
 		
@@ -188,9 +187,6 @@ class TrainTerry2Command extends Command {
 							$strategy_name .= '_' . $indicator_name;
 						}
 
-						if (in_array($strategy_name, $strategy_open_position)) {
-							continue;
-						}
 
 						$indicators_overbought = $overbought_or_underbought == 'overbought';
 						$indicators_underbought = $overbought_or_underbought == 'underbought';
@@ -209,6 +205,12 @@ class TrainTerry2Command extends Command {
 									$long = TRUE;
 									$candle_strength = $candle_strengths['long'];
 								}
+
+
+                        		                        if (in_array($bounds_strategy_name, $strategy_open_position)) {
+                	                	                        continue;
+		                                                }
+
 
 								$endmin = $min + (2 * 60 * 60);
 

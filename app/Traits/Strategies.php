@@ -1317,7 +1317,7 @@ trait Strategies
 		foreach(['long', 'short'] as $los) {
 			$indicators = ${$los.'_indicators'};
 			$bounds_methods = array_keys(${$los.'_bounds_methods'});
-			echo $los . ' indicators: '.implode(',',array_values($indicators));
+			echo $los . ' indicators ('.$interval.'): '.implode(',',array_values($indicators));
 			$info = '.. '.count($indicators).' '.$los.' indicators and '.$los.'  candle strength '.$candle_strengths[$los].'...(worthy bounds methods: '.implode(',', $bounds_methods).')';
 			echo $info;
 
@@ -1333,7 +1333,7 @@ trait Strategies
 				}
 
 //				DB::enableQueryLog();
-				$knowledge = DB::table('terry_strategy_knowledge')
+				$knowledge = DB::table('terry_strategy_knowledge AS t1')
 					->select(DB::raw('*'))
 					->where('instrument', $pair)
 					->where('interval', $interval)
@@ -1342,6 +1342,9 @@ trait Strategies
 //					->where('percentage_'.$los.'_win', '>=', 0) // successful strats only
 //					->where('test_confirmations', '>=', 1) // with enough confirmations to be a valuable stat
 					->where('candle_strength', '>', 0)
+
+			// experiment, only consider if the avg result for all bounds methods is positive 
+					->whereRaw('(select avg(avg_profit) from terry_strategy_knowledge AS t2 where t2.strategy_name = t1.strategy_name and t2.interval = t1.interval and t1.instrument = t2.instrument) > 0')
 					->whereIn('strategy_name', $strategy_names) 
 					->whereIn('bounds_strategy_name', $bounds_methods) 
 //					->whereIn('candle_strength', $this->get_candle_strength_range($candle_strengths[$los]))
@@ -1429,7 +1432,6 @@ trait Strategies
 				}
 			}
 		}
-		
 		return gettype($methods) == 'string' ?  array_pop($ret) : $ret;
 	}
 	
@@ -1446,22 +1448,33 @@ trait Strategies
 //		$long_entry = $current_price - $spread_price_range/2;
 //		$short_entry = $current_price + $spread_price_range/2;
 		
-		$min_long_take_profit = $current_price + round(($current_price * (4 / $leverage)) / 100, 5);
-		$max_long_stop_loss = $current_price - round(($current_price * (4 / $leverage)) / 100, 5);
-		$max_short_take_profit = $current_price - round(($current_price * (4 / $leverage)) / 100, 5);
-		$min_short_stop_loss = $current_price + round(($current_price * (4 / $leverage)) / 100, 5);
+		$perc = 8;
+		$min_long_take_profit = $current_price + round(($current_price * ($perc / $leverage)) / 100, 6);
+		$max_long_stop_loss = $current_price - round(($current_price * ($perc / $leverage)) / 100, 6);
+		$max_short_take_profit = $current_price - round(($current_price * ($perc / $leverage)) / 100, 6);
+		$min_short_stop_loss = $current_price + round(($current_price * ($perc / $leverage)) / 100, 6);
 		
 		echo "current price: $current_price \n";
 		foreach($this->get_bounds($data, TRUE, $current_price, $leverage) as $bounds_method=>$bounds) {
 			list($stop_loss_long, $take_profit_long) = $bounds;
-			echo "\nbounds method: $bounds_method...  long stop take: $stop_loss_long, $take_profit_long     range: (".($take_profit_long-$stop_loss_long)." )\n";
+			if(empty($stop_loss_long) || empty($take_profit_long)) {
+				echo "\nbounds method: $bounds_method ($interval)...  either take or loss is EMPTY!  long stop take: $stop_loss_long, $take_profit_long  .....continue...";
+				continue;
+			}
+
+			echo "\nbounds method: $bounds_method ($interval)...  long stop take: $stop_loss_long, $take_profit_long     range: (".($take_profit_long-$stop_loss_long)." )\n";
 			if($take_profit_long > $min_long_take_profit && $stop_loss_long < $max_long_stop_loss) {
 				$profitable_long_bounds_methods[$bounds_method] = $bounds;
 			}
 		}
 		foreach($this->get_bounds($data, FALSE, $current_price, $leverage) as $bounds_method=>$bounds) {
 			list($stop_loss_short, $take_profit_short) = $bounds;
-			echo "\nbounds method: $bounds_method...  short stop take: $stop_loss_short, $take_profit_short      range: (".($stop_loss_short-$take_profit_short)." ) \n";
+                        if(empty($stop_loss_short) || empty($take_profit_short)) {
+                                echo "\nbounds method: $bounds_method ($interval)...  either take or loss is EMPTY!  short stop take: $stop_loss_short, $take_profit_short  .....continue...";
+                                continue;
+                        }
+
+			echo "\nbounds method: $bounds_method ($interval)...  short stop take: $stop_loss_short, $take_profit_short      range: (".($stop_loss_short-$take_profit_short)." ) \n";
 			if($take_profit_short < $max_short_take_profit && $stop_loss_short > $min_short_stop_loss) {
 				$profitable_short_bounds_methods[$bounds_method] = $bounds; 
 			}

@@ -39,6 +39,7 @@ class WhaleClubExperimentCommand extends Command {
 	protected $description = '';
 	protected $order_cooloff;
 	protected $last_order_bounds = [];
+	protected $last_terry_tip;
 
 	public function shutdown() {
 		if (!is_array($this->indicator_positions)) {
@@ -71,6 +72,8 @@ class WhaleClubExperimentCommand extends Command {
 	 */
 	public function handle() {
 		ini_set('memory_limit', '2G');
+		date_default_timezone_set('UTC');
+
 		echo "PRESS 'q' TO QUIT AND CLOSE ALL POSITIONS\n\n\n";
 		stream_set_blocking(STDIN, 0);
 
@@ -86,7 +89,7 @@ class WhaleClubExperimentCommand extends Command {
 		$last_candle_times = [];
 		$skipped = 0;
 		$skip_weekends = FALSE;
-		$data_min_datetime = '2018-06-05 15:07:00'; #  '0000-00-00 00:00:00';
+		$data_min_datetime = '2018-06-13 12:00:00'; #  '0000-00-00 00:00:00';
 		$leverage = 222;
 		$spread = '0.1';
 
@@ -105,20 +108,20 @@ class WhaleClubExperimentCommand extends Command {
 				sleep(10);
 				$p = $wc[$instrument]->positionGet($pos['id']);
 				if (isset($p['profit'])) {
-					file_put_contents('/home/tom/results/wc_experiment_' . date('Y-m-d'), "\n\nCLOSED:\n" . print_r($pos, 1) . "\n" . print_r($p, 1) . "\n-----------------------", FILE_APPEND);
+					$inf = ['pos now'=>$p, 'pos open'=>$pos, 'terry tip'=>$this->last_terry_tip];
+					file_put_contents('/home/tom/results/wc_experiment_' . date('Y-m-d'), "\n\nCLOSED:\n" . print_r($inf, 1) . "\n-----------------------", FILE_APPEND);
 					if ($p['profit'] >= 0) {
-						$this->mailer('WIN!', [$p, $pos]);
+						$this->mailer('WIN!', $inf);
 					} else {
-						$this->mailer('LOSE!', [$p, $pos]);
+						$this->mailer('LOSE!', $inf);
 					}
 					unset($this->positions[$i]);
 				}
 			}
 
-			foreach (['1m', '5m', '15m', '30m', '1h'] as $interval) {
+			foreach (['15m', '5m', '30m', '1h'/*, '1m'*/] as $interval) { // go through in order of avg profit (using avg results from training)
 				$now = time();
 				$now_date = date('Y-m-d H:i:s', $now);
-
 				$secs_since_min_datetime = strtotime($now_date) - strtotime($data_min_datetime);
 				$secs_since_market_open = $skip_weekends ? ($now - strtotime(date('Y-m-d 22:00:00', date('w', $now) == "0" ? strtotime('today', $now) : strtotime('last Sunday', $now)))) : PHP_INT_MAX;
 				$interval_upper_limit = min($secs_since_market_open, $secs_since_min_datetime);
@@ -202,13 +205,15 @@ class WhaleClubExperimentCommand extends Command {
 							echo ", strong signal but current price $current_price within bounds of last order (" . $this->last_order_bounds[$instrument][0] . " - " . $this->last_order_bounds[$instrument][1] . ")..\n";
 						} else {
 							echo ", Strong signal! .. current price found: $current_price..\n\n";
+
+							$this->last_terry_tip = $result;
 							$this->last_order_bounds[$instrument] = null;
 							if (is_numeric($current_price) && $current_price > 0) {
 								if ($direction < 0) {
 									echo "$instrument ($interval) at $now [$now_date]:   It's happening, going SHORT..\n";
 
 									$console->buzzer();
-									list($stop_loss, $take_profit) = $this->get_bounds($data, FALSE, $current_price, $levereage, $result['bounds_method']);
+									list($stop_loss, $take_profit) = $this->get_bounds($data, FALSE, $current_price, $leverage, $result['bounds_method']);
 
 									$order = [
 										'direction' => 'short'
@@ -232,7 +237,7 @@ class WhaleClubExperimentCommand extends Command {
 								if ($direction > 0) {
 									echo "$instrument ($interval) at $now [$now_date]:   It's happening, going LONG..\n";
 
-									list($stop_loss, $take_profit) = $this->get_bounds($data, TRUE, $current_price, $levereage, [$result['bounds_method']])[$result['bounds_method']];
+									list($stop_loss, $take_profit) = $this->get_bounds($data, TRUE, $current_price, $leverage, [$result['bounds_method']])[$result['bounds_method']];
 
 									$console->buzzer();
 									$order = [
@@ -254,12 +259,12 @@ class WhaleClubExperimentCommand extends Command {
 									}
 								}
 								if (isset($position['entered_at'])) {
-									file_put_contents('/home/tom/results/wc_experiment_' . date('Y-m-d'), "$instrument position created!:\n" . print_r($order, 1) . "\n" . print_r($position, 1) . "\n-----------------------", FILE_APPEND);
+									file_put_contents('/home/tom/results/wc_experiment_' . date('Y-m-d'), "$instrument position created!:\n" . print_r([$order, ['position'=>$position, 'terry tip'=>$this->last_terry_tip]], 1) . "\n" . print_r($position, 1) . "\n-----------------------", FILE_APPEND);
 									$this->positions[] = $position;
-									$this->mailer($direction > 0 ? 'Going long' : 'Going short', $position);
+									$this->mailer($direction > 0 ? 'Going long' : 'Going short', ['position'=>$position, 'terry tip'=>$this->last_terry_tip]);
 									echo "$instrument ($interval):: Created position..\n\n... no new positions until outside bounds: " . print_r($this->last_order_bounds, 1) . "\n\n\n";
 								} else {
-									file_put_contents('/home/tom/results/wc_experiment_' . date('Y-m-d'), "$instrument POSITION NOT CREATED!!!!\n" . print_r($order, 1) . "\n" . print_r($position, 1) . "\n-----------------------", FILE_APPEND);
+									file_put_contents('/home/tom/results/wc_experiment_' . date('Y-m-d'), "$instrument POSITION NOT CREATED!!!!\n" . print_r([$order, ['position'=>$position, 'terry tip'=>$this->last_terry_tip]], 1) . "\n" . print_r($position, 1) . "\n-----------------------", FILE_APPEND);
 									echo "$instrument ($interval):: Position not created...! \n";
 								}
 							}

@@ -529,26 +529,31 @@ trait OHLC {
 			$variance = (int) 108000;
 		}
 
+//DB::enableQueryLog();
 
 
 		$current_time = $current_time ? $current_time : time();
 		$a = \DB::table('bowhead_ohlc_' . $periodSize)
-				->select(DB::raw('*, unix_timestamp(ctime) as buckettime'))
+//				->select(DB::raw('*, unix_timestamp(ctime) as buckettime'))
 				->where('instrument', $pair)
 				->where('timeid', '<=', date('YmdHi', $current_time))
 				->orderby('timeid', 'DESC')
 				->limit($limit)
 				->get();
 		echo 'getRecentData (' . $pair . '): ' . date(' Y-m-d H:i:s ', $current_time) . "\n";
+//die(date('YmdHi', $current_time));
+//echo  print_r(DB::getQueryLog(), 1);die;
+//DB::disableQueryLog();
+
+
 
 		$periods = [];
 		$ptime = null;
 		$validperiods = 0;
 
-		foreach ($a as $ab) {
+		foreach ($a as $i=>$ab) {
 			$array = (array) $ab;
-			$array['buckettime'] = strtotime($array['ctime']); // since mysql unix_timestamp attempt was returning timestamps an hour out (maybe due to BST?)
-
+			$a[$i]->buckettime = $array['buckettime'] = strtotime($array['ctime']); // since mysql unix_timestamp attempt was returning timestamps an hour out (maybe due to BST?)
 			$ftime = $array['buckettime'];
 //			echo date('Y-m-d H:i:s', $current_time)."\n";
 //			echo date('Y-m-d H:i:s', $ftime)."\n\n";
