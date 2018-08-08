@@ -52,7 +52,7 @@ class CheckTerryCommand extends Command {
 		$instrument = 'EUR/USD';
 		$skip_weekends = TRUE;
 		$results_dir = '/home/tom/results';
-		$results_filename = 'terry3_exact_eurusd';
+		$results_filename = 'terry3_exact_eurusd_85';
 		$results = [];
 
 		$strategy_open_position = [];
@@ -123,15 +123,17 @@ class CheckTerryCommand extends Command {
 
 				list($profitable_long_bounds_methods, $profitable_short_bounds_methods) = $this->get_profitable_bounds_methods($current_price, $data, $leverage, $spread, $interval);
 				$terry_result = $this->check_terry_knowledge3(str_replace(['/', '-'], '_', $instrument), $indicator_results, $candles, $interval, $profitable_long_bounds_methods, $profitable_short_bounds_methods);
-				//print_r($terry_result);
+				print_r($terry_result);
 
 				$overbought = $underbought = $direction = 0;
 				if ($terry_result['signal'] == 'long') {
+//die ('a');
 					$direction = 1;
 					echo "$instrument ($interval): Found long signal... " ;
 					//print_r($terry_result, 1);die;
 					$underbought = 1;
 				} elseif ($terry_result['signal'] == 'short') {
+//die ('b');
 					$direction = -1;
 					echo "$instrument ($interval): Found short signal... " ;//. print_r($terry_result, 1);
                                         //print_r($terry_result, 1);die;
@@ -182,8 +184,8 @@ class CheckTerryCommand extends Command {
 					// keep note of end time for this trade.
 					$strategy_open_position[$bounds_strategy_name] = $result['time'];
 
-					foreach ([$bounds_strategy_name] as $bounds_strategy_name) {
-						if (1) {//for ($current_candle_count = $candle_count/*1*/; $current_candle_count <= $candle_count; $current_candle_count++) { 
+					foreach ([$bounds_strategy_name, 'all', 'interval_'.$interval] as $bounds_strategy_name) {
+//						if (1) {//for ($current_candle_count = $candle_count/*1*/; $current_candle_count <= $candle_count; $current_candle_count++) { 
 							$bounds_strategy_name_with_candle_strength = $bounds_strategy_name . ' + candlestrength:' . $candle_strength;
 							if (!isset($results[$bounds_strategy_name_with_candle_strength])) {
 								$results[$bounds_strategy_name_with_candle_strength] = [
@@ -265,17 +267,17 @@ class CheckTerryCommand extends Command {
 								$results[$bounds_strategy_name_with_candle_strength]['avg_short_profit'] = (($results[$bounds_strategy_name_with_candle_strength]['avg_short_profit'] * ($results[$bounds_strategy_name_with_candle_strength]['total_shorts'] - 1)) + $percentage_profit) / $results[$bounds_strategy_name_with_candle_strength]['total_shorts'];
 							}
 							$results[$bounds_strategy_name_with_candle_strength]['avg_profit'] = (($results[$bounds_strategy_name_with_candle_strength]['avg_profit'] * ($results[$bounds_strategy_name_with_candle_strength]['positions_count'] - 1)) + $percentage_profit) / $results[$bounds_strategy_name_with_candle_strength]['positions_count'];
-						}
+//						}
 					}
 				}
 			}
 
 			// compile result report.. print, put in knowledge table, etc
 			if (!($min % 86400) || $min == $end_min) {
-				$percs = [];
+				$percs = $avg_profits = [];
 				foreach ($results as $strategy_name => $data) {
 //					// get candle + trend % successes and fails, including their use as anti signals
-					foreach (['candle', 'inverse_candle', 'trend', 'inverse_trend'] as $cot) {
+/*					foreach (['candle', 'inverse_candle', 'trend', 'inverse_trend'] as $cot) {
 						foreach (['long', 'short'] as $los) {
 							$key_correct = $los . '_correct_' . $cot;
 							$key_wrong = $los . '_wrong_' . $cot;
@@ -303,7 +305,7 @@ class CheckTerryCommand extends Command {
 								array_multisort($to_sort_by, $results[$strategy_name][$key_perc]);
 							}
 						}
-					}
+					}*/
 
 					if ($results[$strategy_name]['total_longs']) {
 						unset($results[$strategy_name]['% PERCENTAGE LONG win']);
@@ -321,8 +323,9 @@ class CheckTerryCommand extends Command {
 					}
 
 					$percs[] = $perc;
+					$avg_profits[] = $results[$strategy_name]['avg_profit'];
 				}
-				array_multisort($percs, $results);
+				array_multisort($avg_profits, $results);
 				$significant_results = [];
 				foreach ($results as $key => $result) {
 					if ($results[$strategy_name]['% PERCENTAGE WIN'] > -1) { //50) {

@@ -1337,14 +1337,14 @@ trait Strategies
 					->select(DB::raw('*'))
 					->where('instrument', $pair)
 					->where('interval', $interval)
-					->where('percentage_'.$los.'_win', '>=', 70) // successful strats only
-					->where('test_confirmations', '>=', 5) // with enough confirmations to be a valuable stat
+					->where('percentage_'.$los.'_win', '>=', 85) // successful strats only
+					->where('test_confirmations', '>=', 20) // with enough confirmations to be a valuable stat
 //					->where('percentage_'.$los.'_win', '>=', 0) // successful strats only
 //					->where('test_confirmations', '>=', 1) // with enough confirmations to be a valuable stat
 					->where('candle_strength', '>', 0)
 
 			// experiment, only consider if the avg result for all bounds methods is positive 
-					->whereRaw('(select avg(avg_profit) from terry_strategy_knowledge AS t2 where t2.strategy_name = t1.strategy_name and t2.interval = t1.interval and t1.instrument = t2.instrument) > 0')
+				->whereRaw('(select avg(avg_profit) from terry_strategy_knowledge AS t2 where t2.strategy_name = t1.strategy_name and t2.interval = t1.interval and t1.instrument = t2.instrument) > 0')
 					->whereIn('strategy_name', $strategy_names) 
 					->whereIn('bounds_strategy_name', $bounds_methods) 
 //					->whereIn('candle_strength', $this->get_candle_strength_range($candle_strengths[$los]))
@@ -1352,7 +1352,7 @@ trait Strategies
 
 
 				$knowledge = $knowledge->get();
-//echo  print_r(DB::getQueryLog(), 1);
+//echo  print_r(DB::getQueryLog(), 1);die;
 //				file_put_contents('/home/tom/results/wc_experiment_queries', print_r(DB::getQueryLog(), 1), FILE_APPEND);
 //				DB::disableQueryLog();
 
@@ -1458,25 +1458,43 @@ trait Strategies
 		foreach($this->get_bounds($data, TRUE, $current_price, $leverage) as $bounds_method=>$bounds) {
 			list($stop_loss_long, $take_profit_long) = $bounds;
 			if(empty($stop_loss_long) || empty($take_profit_long)) {
-				echo "\nbounds method: $bounds_method ($interval)...  either take or loss is EMPTY!  long stop take: $stop_loss_long, $take_profit_long  .....continue...";
+				echo "\nbounds method: $bounds_method ($interval)...  Skipping, either take or loss is EMPTY!  long stop take: $stop_loss_long, $take_profit_long  .....continue...";
 				continue;
 			}
 
-			echo "\nbounds method: $bounds_method ($interval)...  long stop take: $stop_loss_long, $take_profit_long     range: (".($take_profit_long-$stop_loss_long)." )\n";
+			/*Didn't seem to work....
+			// New idea.. check that loss is never greater then profit as that is probably not such a wise position
+			if(abs($take_profit_long - $current_price) < abs($stop_loss_long - $current_price)) {
+                                echo "\nbounds method: $bounds_method ($interval)...  Skipping, profit less than loss: test: abs(\$take_profit_long - \$current_price) < abs(\$stop_loss_long - \$current_price) (abs($take_profit_long - $current_price) < abs($stop_loss_long - $current_price)) - silly trade? .....continue...";
+				continue;
+			}*/
+
 			if($take_profit_long > $min_long_take_profit && $stop_loss_long < $max_long_stop_loss) {
+				echo "\nbounds method: $bounds_method ($interval)... OK! long stop take: $stop_loss_long, $take_profit_long     range: (".($take_profit_long-$stop_loss_long)." )\n";
 				$profitable_long_bounds_methods[$bounds_method] = $bounds;
+			} else {
+                                echo "\nbounds method: $bounds_method ($interval)...  Skipping, profit / loss too small : test failed: \$take_profit_long > \$min_long_take_profit && \$stop_loss_long < \$max_long_stop_loss ($take_profit_long > $min_long_take_profit && $stop_loss_long < $max_long_stop_loss) - silly trade? .....continue...";
 			}
 		}
 		foreach($this->get_bounds($data, FALSE, $current_price, $leverage) as $bounds_method=>$bounds) {
 			list($stop_loss_short, $take_profit_short) = $bounds;
                         if(empty($stop_loss_short) || empty($take_profit_short)) {
-                                echo "\nbounds method: $bounds_method ($interval)...  either take or loss is EMPTY!  short stop take: $stop_loss_short, $take_profit_short  .....continue...";
+                                echo "\nbounds method: $bounds_method ($interval)...  Skipping, either take or loss is EMPTY!  short stop take: $stop_loss_short, $take_profit_short  .....continue...";
                                 continue;
                         }
 
-			echo "\nbounds method: $bounds_method ($interval)...  short stop take: $stop_loss_short, $take_profit_short      range: (".($stop_loss_short-$take_profit_short)." ) \n";
+			/*Didn't seem to work....
+                        // // New idea.. check that loss is never greater then profit as that is probably not such a wise position
+			if(abs($take_profit_short - $current_price) < abs($stop_loss_short - $current_price)) {
+                                echo "\nbounds method: $bounds_method ($interval)...  Skipping, profit less than loss: test: abs(\$take_profit_short - \$current_price) < abs(\$stop_loss_short - \$current_price)) (abs($take_profit_short - $current_price) < abs($stop_loss_short - $current_price))) - silly trade? .....continue...";
+				continue;
+			}*/
+
 			if($take_profit_short < $max_short_take_profit && $stop_loss_short > $min_short_stop_loss) {
+				echo "\nbounds method: $bounds_method ($interval)...  OK! short stop take: $stop_loss_short, $take_profit_short      range: (".($stop_loss_short-$take_profit_short)." ) \n";
 				$profitable_short_bounds_methods[$bounds_method] = $bounds; 
+			} else {
+                                echo "\nbounds method: $bounds_method ($interval)...  Skipping, profit / loss too small : test failed: \$take_profit_short < \$max_short_take_profit && \$stop_loss_short > \$min_short_stop_loss ($take_profit_short < $max_short_take_profit && $stop_loss_short > $min_short_stop_loss) - silly trade? .....continue...";
 			}
 		}
 		return [$profitable_long_bounds_methods, $profitable_short_bounds_methods];

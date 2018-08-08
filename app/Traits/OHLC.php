@@ -529,7 +529,7 @@ trait OHLC {
 			$variance = (int) 108000;
 		}
 
-//DB::enableQueryLog();
+#DB::enableQueryLog();
 
 
 		$current_time = $current_time ? $current_time : time();
@@ -542,8 +542,8 @@ trait OHLC {
 				->get();
 		echo 'getRecentData (' . $pair . '): ' . date(' Y-m-d H:i:s ', $current_time) . "\n";
 //die(date('YmdHi', $current_time));
-//echo  print_r(DB::getQueryLog(), 1);die;
-//DB::disableQueryLog();
+#echo  print_r(DB::getQueryLog(), 1);die;
+#DB::disableQueryLog();
 
 
 

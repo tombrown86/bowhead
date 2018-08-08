@@ -73,9 +73,9 @@ class TrainTerry2Command extends Command {
 		$results_dir = '/home/tom/results';
 
 //		$instrument_set = ['EUR/GBP', 'GBP/JPY', 'EUR/USD', 'GBP/USD', ];
-		$instrument_set = ['EUR/USD'];
+		$instrument_set = ['EUR/GBP'];
 		$instrument_set_str = str_replace('/', '_', implode(',', $instrument_set));
-		
+
 		$results_filename = $instrument_set_str.'_exactmatches_many_bounds';
 
 		$results_obj_filename = $results_filename . '_RESULTS_OBJ';
@@ -86,17 +86,18 @@ class TrainTerry2Command extends Command {
 		$skipped = 0;
 		$spread = 0.01; // fixed for now..
 		$leverage = 222;
-		
+
 		$results = [];
-		$results = (array)json_decode(file_get_contents("$results_dir/$results_obj_filename"), TRUE); // (rememeber to update $start_mind !)
-		
+		// note that resuming from file isn't perfect.. it doesn't reload the currently open trades!
+//		$results = (array)json_decode(file_get_contents("$results_dir/$results_obj_filename"), TRUE); // (rememeber to update $start_min !)
+
 		foreach($instrument_set as $instrument){
 			$results = [];
 			$end_min = strtotime('2017-01-01 00:00:00');
-			$start_min = strtotime('2016-04-14');#2015-01-03 00:00:00'); 
+			$start_min = strtotime('2015-01-03 00:00:00'); 
 
 			$strategy_open_position = [];
-		
+
 			for ($min = $start_min; $min <= $end_min; $min += 60) {
 				$min_date = date('Y-m-d H:i:s', $min);
 				if ($skip_weekends &&

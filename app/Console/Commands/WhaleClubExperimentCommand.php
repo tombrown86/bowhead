@@ -89,7 +89,8 @@ class WhaleClubExperimentCommand extends Command {
 		$last_candle_times = [];
 		$skipped = 0;
 		$skip_weekends = FALSE;
-		$data_min_datetime = '2018-06-13 12:00:00'; #  '0000-00-00 00:00:00';
+
+		$data_min_datetime = '2018-08-07 14:51:02'; #  '0000-00-00 00:00:00';
 		$leverage = 222;
 		$spread = '0.1';
 
@@ -119,7 +120,7 @@ class WhaleClubExperimentCommand extends Command {
 				}
 			}
 
-			foreach (['15m', '5m', '30m', '1h'/*, '1m'*/] as $interval) { // go through in order of avg profit (using avg results from training)
+			foreach (['15m', '5m', '30m', '1h', '1m'] as $interval) { // go through in order of avg profit (using avg results from training)
 				$now = time();
 				$now_date = date('Y-m-d H:i:s', $now);
 				$secs_since_min_datetime = strtotime($now_date) - strtotime($data_min_datetime);
