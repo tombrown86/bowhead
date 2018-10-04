@@ -250,12 +250,12 @@ class TrainTerryCommand extends Command {
 
 							if ($long) {
 								if (!isset($win_or_lose_long[$bounds_method])) {
-									$win_or_lose_long[$bounds_method] = $this->getWinOrLoose($instrument, $min, $endmin, TRUE, $take, $stop, $current_price, $leverage, $spread);
+									$win_or_lose_long[$bounds_method] = $this->getWinOrLose($instrument, $min, $endmin, TRUE, $take, $stop, $current_price, $leverage, $spread);
 								}
 								$result = $win_or_lose_long[$bounds_method];
 							} else {
 								if (!isset($win_or_lose_short[$bounds_method])) {
-									$win_or_lose_short[$bounds_method] = $this->getWinOrLoose($instrument, $min, $endmin, FALSE, $take, $stop, $current_price, $leverage, $spread);
+									$win_or_lose_short[$bounds_method] = $this->getWinOrLose($instrument, $min, $endmin, FALSE, $take, $stop, $current_price, $leverage, $spread);
 								}
 								$result = $win_or_lose_short[$bounds_method];
 							}

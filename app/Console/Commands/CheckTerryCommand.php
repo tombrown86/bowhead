@@ -38,6 +38,10 @@ class CheckTerryCommand extends Command {
 	 *  this is the part of the command that executes.
 	 */
 	public function handle() {
+		
+		die(print_r($this->winOrLoseTest()));
+		
+		
 		$terry_strategy_knowledge = new Models\terry_strategy_knowledge();
 
 		echo "PRESS 'q' TO QUIT AND CLOSE ALL POSITIONS\n\n\n";
@@ -49,11 +53,15 @@ class CheckTerryCommand extends Command {
 		$cand = new Util\Candles();
 		$ind = new Util\Indicators();
 
-		$instrument = 'EUR/USD';
+		$instrument = 'EUR/GBP';
 		$skip_weekends = TRUE;
 		$results_dir = '/home/tom/results';
-		$results_filename = 'terry3_exact_eurusd_85';
+		$results_filename = 'terry3_exact_eurgbp_0.03_spread_85_only_pos_win';
 		$results = [];
+
+		
+		$spread = ['EUR_USD' => 0.02, 'EUR_GBP' => 0.03, 'GBP_USD' => 0.06, /* 'GBP_JPY' => */];
+		$spread = $spread[str_replace('/', '_', $instrument)];
 
 		$strategy_open_position = [];
 
@@ -63,7 +71,6 @@ class CheckTerryCommand extends Command {
 		$end_min = strtotime('2018-01-01 00:00:00');
 		$start_min = strtotime('2017-01-04 00:00:00');
 
-		$spread = '0.01'; // fixed for now..
 		$leverage = 222;
 
 		for ($min = $start_min; $min <= $end_min; $min += 60) {
@@ -121,22 +128,23 @@ class CheckTerryCommand extends Command {
 				$candles = $this->candle_value($data);
 				$indicator_results = $ind->allSignals($instrument, $data);
 
-				list($profitable_long_bounds_methods, $profitable_short_bounds_methods) = $this->get_profitable_bounds_methods($current_price, $data, $leverage, $spread, $interval);
-				$terry_result = $this->check_terry_knowledge3(str_replace(['/', '-'], '_', $instrument), $indicator_results, $candles, $interval, $profitable_long_bounds_methods, $profitable_short_bounds_methods);
+				$spread_price = $spread * $current_price / 100;
+				list($profitable_long_bounds_methods, $profitable_short_bounds_methods) = $this->get_profitable_bounds_methods($current_price, $data, $leverage, $spread_price, $interval);
+				$terry_result = $this->check_terry_knowledge3(str_replace(['/', '-'], '_', $instrument) . '_more', $indicator_results, $candles, $interval, $profitable_long_bounds_methods, $profitable_short_bounds_methods);
 				print_r($terry_result);
 
 				$overbought = $underbought = $direction = 0;
 				if ($terry_result['signal'] == 'long') {
 //die ('a');
 					$direction = 1;
-					echo "$instrument ($interval): Found long signal... " ;
+					echo "$instrument ($interval): Found long signal... ";
 					//print_r($terry_result, 1);die;
 					$underbought = 1;
 				} elseif ($terry_result['signal'] == 'short') {
 //die ('b');
 					$direction = -1;
-					echo "$instrument ($interval): Found short signal... " ;//. print_r($terry_result, 1);
-                                        //print_r($terry_result, 1);die;
+					echo "$instrument ($interval): Found short signal... "; //. print_r($terry_result, 1);
+					//print_r($terry_result, 1);die;
 
 					$overbought = 1;
 				} else {
@@ -144,7 +152,7 @@ class CheckTerryCommand extends Command {
 				}
 
 				if ($direction != 0) {
-					$bounds_strategy_name = $results_filename."_".$terry_result['bounds_method'];
+					$bounds_strategy_name = $results_filename . "_" . $terry_result['bounds_method'];
 					if (in_array($bounds_strategy_name, $strategy_open_position)) {
 						continue;
 					}
@@ -159,22 +167,22 @@ class CheckTerryCommand extends Command {
 						$candle_strength = $candle_strengths['long'];
 					}
 
-					$endmin = $min + (2 * 60 * 60);
+					$endmin = $min + (24 * 60 * 60);
 					list($stop, $take) = $this->get_bounds($data, $long, $current_price, $leverage, $terry_result['bounds_method']);
 
 					if ($long) {
 						if (!isset($win_or_lose_long[$terry_result['bounds_method']])) {
-							$win_or_lose_long[$terry_result['bounds_method']] = $this->getWinOrLoose($instrument, $min, $endmin, TRUE, $take, $stop, $current_price, $leverage, $spread);
+							$win_or_lose_long[$terry_result['bounds_method']] = $this->getWinOrLose($instrument, $min, $endmin, TRUE, $take, $stop, $current_price, $leverage, $spread);
 						}
 						$result = $win_or_lose_long[$terry_result['bounds_method']];
 					} else {
 						if (!isset($win_or_lose_short[$terry_result['bounds_method']])) {
-							$win_or_lose_short[$terry_result['bounds_method']] = $this->getWinOrLoose($instrument, $min, $endmin, FALSE, $take, $stop, $current_price, $leverage, $spread);
+							$win_or_lose_short[$terry_result['bounds_method']] = $this->getWinOrLose($instrument, $min, $endmin, FALSE, $take, $stop, $current_price, $leverage, $spread);
 						}
 						$result = $win_or_lose_short[$terry_result['bounds_method']];
 					}
 
-					if($result['win']) {
+					if ($result['win']) {
 						echo "\nWIN!!!!!!!!!!!!!!!!!!!!\n";
 					} else {
 						echo "\nLOSE @@@@@@@@@@@@@@@@@@@@ \n";
@@ -184,89 +192,89 @@ class CheckTerryCommand extends Command {
 					// keep note of end time for this trade.
 					$strategy_open_position[$bounds_strategy_name] = $result['time'];
 
-					foreach ([$bounds_strategy_name, 'all', 'interval_'.$interval] as $bounds_strategy_name) {
+					foreach ([$bounds_strategy_name, 'all', 'interval_' . $interval] as $bounds_strategy_name) {
 //						if (1) {//for ($current_candle_count = $candle_count/*1*/; $current_candle_count <= $candle_count; $current_candle_count++) { 
-							$bounds_strategy_name_with_candle_strength = $bounds_strategy_name . ' + candlestrength:' . $candle_strength;
-							if (!isset($results[$bounds_strategy_name_with_candle_strength])) {
-								$results[$bounds_strategy_name_with_candle_strength] = [
-									'strategy_name' => $bounds_strategy_name,
-									'bounds_strategy_name' => $terry_result['bounds_method'],
-									'indicator_count' => $terry_result['knowledge_row']->indicator_count,
-									'long_wins' => 0,
-									'short_wins' => 0,
-									'long_loses' => 0,
-									'short_loses' => 0,
-									'timeout_loses' => 0,
-									'wins_plus_loses' => 0,
-									'positions_count' => 0,
-									'total_longs' => 0,
-									'total_shorts' => 0,
-									'total_wins' => 0,
-									'total_loses' => 0,
-									'avg_stop_take_range' => 0,
-									'avg_long_profit' => 0,
-									'avg_short_profit' => 0,
-									'avg_profit' => 0,
-									'candle_strength' => 1/* $candle_strength */,
-									'interval' => $interval,
-										/* these will be created as necessary
-										  'long_correct_candle' => [],
-										  'long_correct_inverse_candle' => [],
-										  'long_wrong_candle' => [],
-										  'long_wrong_inverse_candle' => [],
-										  'short_correct_candle' => [],
-										  'short_correct_inverse_candle' => [],
-										  'short_wrong_candle' => [],
-										  'short_wrong_inverse_candle' => [],
+						$bounds_strategy_name_with_candle_strength = $bounds_strategy_name . ' + candlestrength:' . $candle_strength;
+						if (!isset($results[$bounds_strategy_name_with_candle_strength])) {
+							$results[$bounds_strategy_name_with_candle_strength] = [
+								'strategy_name' => $bounds_strategy_name,
+								'bounds_strategy_name' => $terry_result['bounds_method'],
+								'indicator_count' => $terry_result['knowledge_row']->indicator_count,
+								'long_wins' => 0,
+								'short_wins' => 0,
+								'long_loses' => 0,
+								'short_loses' => 0,
+								'timeout_loses' => 0,
+								'wins_plus_loses' => 0,
+								'positions_count' => 0,
+								'total_longs' => 0,
+								'total_shorts' => 0,
+								'total_wins' => 0,
+								'total_loses' => 0,
+								'avg_stop_take_range' => 0,
+								'avg_long_profit' => 0,
+								'avg_short_profit' => 0,
+								'avg_profit' => 0,
+								'candle_strength' => 1/* $candle_strength */,
+								'interval' => $interval,
+									/* these will be created as necessary
+									  'long_correct_candle' => [],
+									  'long_correct_inverse_candle' => [],
+									  'long_wrong_candle' => [],
+									  'long_wrong_inverse_candle' => [],
+									  'short_correct_candle' => [],
+									  'short_correct_inverse_candle' => [],
+									  'short_wrong_candle' => [],
+									  'short_wrong_inverse_candle' => [],
 
-										  'long_correct_trend' => [],
-										  'long_correct_inverse_trend' => [],
-										  'long_wrong_trend' => [],
-										  'long_wrong_inverse_trend' => [],
-										  'short_correct_trend' => [],
-										  'short_correct_inverse_trend' => [],
-										  'short_wrong_trend' => [],
-										  'short_wrong_inverse_trend' => [],
-										  '% WIN' => 0, */
-								];
-							}
+									  'long_correct_trend' => [],
+									  'long_correct_inverse_trend' => [],
+									  'long_wrong_trend' => [],
+									  'long_wrong_inverse_trend' => [],
+									  'short_correct_trend' => [],
+									  'short_correct_inverse_trend' => [],
+									  'short_wrong_trend' => [],
+									  'short_wrong_inverse_trend' => [],
+									  '% WIN' => 0, */
+							];
+						}
 
-							$prefix = $long ? 'long_' : 'short_';
-							$correct = $result['win'] ? 'correct_' : 'wrong_';
+						$prefix = $long ? 'long_' : 'short_';
+						$correct = $result['win'] ? 'correct_' : 'wrong_';
 
-							foreach ([/* 'trend' => $trends[$instrument], */'candle' => isset($candles['current']) ? $candles['current'] : []] as $cot => $cots) {
-								foreach ($cots as $name => $value) {
-									$inverse = (($value > 0 && $long) || ($value < 0 && !$long)) ? '' : 'inverse_';
-									if (!isset($results[$bounds_strategy_name_with_candle_strength][$prefix . $correct . $cot][$name])) {
-										$results[$bounds_strategy_name_with_candle_strength][$prefix . $correct . $cot][$name] = 1;
-									} else {
-										$results[$bounds_strategy_name_with_candle_strength][$prefix . $correct . $cot][$name];
-									}
+						foreach ([/* 'trend' => $trends[$instrument], */'candle' => isset($candles['current']) ? $candles['current'] : []] as $cot => $cots) {
+							foreach ($cots as $name => $value) {
+								$inverse = (($value > 0 && $long) || ($value < 0 && !$long)) ? '' : 'inverse_';
+								if (!isset($results[$bounds_strategy_name_with_candle_strength][$prefix . $correct . $cot][$name])) {
+									$results[$bounds_strategy_name_with_candle_strength][$prefix . $correct . $cot][$name] = 1;
+								} else {
+									$results[$bounds_strategy_name_with_candle_strength][$prefix . $correct . $cot][$name];
 								}
 							}
+						}
 
-							$results[$bounds_strategy_name_with_candle_strength]['positions_count'] ++;
+						$results[$bounds_strategy_name_with_candle_strength]['positions_count'] ++;
 
-							$result['win'] ? $results[$bounds_strategy_name_with_candle_strength][($long ? 'long_' : 'short_') . 'wins'] ++ : $results[$bounds_strategy_name_with_candle_strength][($long ? 'long_' : 'short_') . 'loses'] ++;
-							$result['win'] ? $results[$bounds_strategy_name_with_candle_strength]['total_wins'] ++ : $results[$bounds_strategy_name_with_candle_strength]['total_loses'] ++;
-							$long ? $results[$bounds_strategy_name_with_candle_strength]['total_longs'] ++ : $results[$bounds_strategy_name_with_candle_strength]['total_shorts'] ++;
-							if ($result['time'] == $endmin) {
-								$results[$bounds_strategy_name_with_candle_strength]['timeout_loses'] ++;
-							}
-							$results[$bounds_strategy_name_with_candle_strength]['wins_plus_loses'] += $result['win'] ? 1 : -1;
+						$result['win'] ? $results[$bounds_strategy_name_with_candle_strength][($long ? 'long_' : 'short_') . 'wins'] ++ : $results[$bounds_strategy_name_with_candle_strength][($long ? 'long_' : 'short_') . 'loses'] ++;
+						$result['win'] ? $results[$bounds_strategy_name_with_candle_strength]['total_wins'] ++ : $results[$bounds_strategy_name_with_candle_strength]['total_loses'] ++;
+						$long ? $results[$bounds_strategy_name_with_candle_strength]['total_longs'] ++ : $results[$bounds_strategy_name_with_candle_strength]['total_shorts'] ++;
+						if ($result['time'] == $endmin) {
+							$results[$bounds_strategy_name_with_candle_strength]['timeout_loses'] ++;
+						}
+						$results[$bounds_strategy_name_with_candle_strength]['wins_plus_loses'] += $result['win'] ? 1 : -1;
 
 
-							$results[$bounds_strategy_name_with_candle_strength]['avg_stop_take_range'] = (($results[$bounds_strategy_name_with_candle_strength]['avg_stop_take_range'] * ($results[$bounds_strategy_name_with_candle_strength]['positions_count'] - 1)) + abs($take - $stop)) / $results[$bounds_strategy_name_with_candle_strength]['positions_count'];
+						$results[$bounds_strategy_name_with_candle_strength]['avg_stop_take_range'] = (($results[$bounds_strategy_name_with_candle_strength]['avg_stop_take_range'] * ($results[$bounds_strategy_name_with_candle_strength]['positions_count'] - 1)) + abs($take - $stop)) / $results[$bounds_strategy_name_with_candle_strength]['positions_count'];
 
-							// enter with whole spread as offset (rather than worry ourselves with separate ask + bid)
-							$percentage_profit = $result['percentage_profit'];
+						// enter with whole spread as offset (rather than worry ourselves with separate ask + bid)
+						$percentage_profit = $result['percentage_profit'];
 
-							if ($long) {
-								$results[$bounds_strategy_name_with_candle_strength]['avg_long_profit'] = (($results[$bounds_strategy_name_with_candle_strength]['avg_long_profit'] * ($results[$bounds_strategy_name_with_candle_strength]['total_longs'] - 1)) + $percentage_profit) / $results[$bounds_strategy_name_with_candle_strength]['total_longs'];
-							} else {
-								$results[$bounds_strategy_name_with_candle_strength]['avg_short_profit'] = (($results[$bounds_strategy_name_with_candle_strength]['avg_short_profit'] * ($results[$bounds_strategy_name_with_candle_strength]['total_shorts'] - 1)) + $percentage_profit) / $results[$bounds_strategy_name_with_candle_strength]['total_shorts'];
-							}
-							$results[$bounds_strategy_name_with_candle_strength]['avg_profit'] = (($results[$bounds_strategy_name_with_candle_strength]['avg_profit'] * ($results[$bounds_strategy_name_with_candle_strength]['positions_count'] - 1)) + $percentage_profit) / $results[$bounds_strategy_name_with_candle_strength]['positions_count'];
+						if ($long) {
+							$results[$bounds_strategy_name_with_candle_strength]['avg_long_profit'] = (($results[$bounds_strategy_name_with_candle_strength]['avg_long_profit'] * ($results[$bounds_strategy_name_with_candle_strength]['total_longs'] - 1)) + $percentage_profit) / $results[$bounds_strategy_name_with_candle_strength]['total_longs'];
+						} else {
+							$results[$bounds_strategy_name_with_candle_strength]['avg_short_profit'] = (($results[$bounds_strategy_name_with_candle_strength]['avg_short_profit'] * ($results[$bounds_strategy_name_with_candle_strength]['total_shorts'] - 1)) + $percentage_profit) / $results[$bounds_strategy_name_with_candle_strength]['total_shorts'];
+						}
+						$results[$bounds_strategy_name_with_candle_strength]['avg_profit'] = (($results[$bounds_strategy_name_with_candle_strength]['avg_profit'] * ($results[$bounds_strategy_name_with_candle_strength]['positions_count'] - 1)) + $percentage_profit) / $results[$bounds_strategy_name_with_candle_strength]['positions_count'];
 //						}
 					}
 				}
@@ -277,35 +285,35 @@ class CheckTerryCommand extends Command {
 				$percs = $avg_profits = [];
 				foreach ($results as $strategy_name => $data) {
 //					// get candle + trend % successes and fails, including their use as anti signals
-/*					foreach (['candle', 'inverse_candle', 'trend', 'inverse_trend'] as $cot) {
-						foreach (['long', 'short'] as $los) {
-							$key_correct = $los . '_correct_' . $cot;
-							$key_wrong = $los . '_wrong_' . $cot;
-							$key_perc = 'PERCENTAGE  ' . $los . '_' . $cot;
-							$all_names = [];
-							if (isset($data[$key_correct])) {
-								foreach ($data[$key_correct] as $name => $count) {
-									$all_names[] = $name;
-								}
-							}
-							if (isset($data[$key_wrong])) {
-								foreach ($data[$key_wrong] as $name => $count) {
-									$all_names[] = $name;
-								}
-							}
-							$all_names_with_outcome = [];
-							$to_sort_by = [];
-							foreach (array_unique($all_names) as $name) {
-								$percent = (((int) @$data[$key_correct][$name] / ((int) @$data[$key_correct][$name] + (int) @$data[$key_wrong][$name])) * 100);
-								$to_sort_by[] = $percent;
-								unset($results[$strategy_name][$key_perc][$name]);
-								$results[$strategy_name][$key_perc][$name] = $percent;
-							}
-							if (count($to_sort_by)) {
-								array_multisort($to_sort_by, $results[$strategy_name][$key_perc]);
-							}
-						}
-					}*/
+					/* 					foreach (['candle', 'inverse_candle', 'trend', 'inverse_trend'] as $cot) {
+					  foreach (['long', 'short'] as $los) {
+					  $key_correct = $los . '_correct_' . $cot;
+					  $key_wrong = $los . '_wrong_' . $cot;
+					  $key_perc = 'PERCENTAGE  ' . $los . '_' . $cot;
+					  $all_names = [];
+					  if (isset($data[$key_correct])) {
+					  foreach ($data[$key_correct] as $name => $count) {
+					  $all_names[] = $name;
+					  }
+					  }
+					  if (isset($data[$key_wrong])) {
+					  foreach ($data[$key_wrong] as $name => $count) {
+					  $all_names[] = $name;
+					  }
+					  }
+					  $all_names_with_outcome = [];
+					  $to_sort_by = [];
+					  foreach (array_unique($all_names) as $name) {
+					  $percent = (((int) @$data[$key_correct][$name] / ((int) @$data[$key_correct][$name] + (int) @$data[$key_wrong][$name])) * 100);
+					  $to_sort_by[] = $percent;
+					  unset($results[$strategy_name][$key_perc][$name]);
+					  $results[$strategy_name][$key_perc][$name] = $percent;
+					  }
+					  if (count($to_sort_by)) {
+					  array_multisort($to_sort_by, $results[$strategy_name][$key_perc]);
+					  }
+					  }
+					  } */
 
 					if ($results[$strategy_name]['total_longs']) {
 						unset($results[$strategy_name]['% PERCENTAGE LONG win']);

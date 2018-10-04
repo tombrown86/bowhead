@@ -1377,17 +1377,14 @@ trait Strategies
 		$methods_arr = (array)$methods;
 
 		// fixed % profit / loss
-		if($methods == NULL || in_array('10%_20%', $methods_arr))
-			$ret['10%_20%'] = $long ? [$current_price - round(($current_price * (10 / $leverage)) / 100, 5), $current_price + round(($current_price * (20 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (10 / $leverage)) / 100, 5), $current_price - round(($current_price * (20 / $leverage)) / 100, 5)];
-		if($methods == NULL || in_array('20%_20%', $methods_arr))
-			$ret['20%_20%'] = $long ? [$current_price - round(($current_price * (20 / $leverage)) / 100, 5), $current_price + round(($current_price * (20 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (20 / $leverage)) / 100, 5), $current_price - round(($current_price * (20 / $leverage)) / 100, 5)];
-		if($methods == NULL || in_array('30%_30%', $methods_arr))
-			$ret['30%_30%'] = $long ? [$current_price - round(($current_price * (30 / $leverage)) / 100, 5), $current_price + round(($current_price * (30 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (30 / $leverage)) / 100, 5), $current_price - round(($current_price * (30 / $leverage)) / 100, 5)];
-		if($methods == NULL || in_array('30%_40%', $methods_arr))
-			$ret['30%_40%'] = $long ? [$current_price - round(($current_price * (30 / $leverage)) / 100, 5), $current_price + round(($current_price * (40 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (30 / $leverage)) / 100, 5), $current_price - round(($current_price * (40 / $leverage)) / 100, 5)];
-		if($methods == NULL || in_array('40%_40%', $methods_arr))
-			$ret['40%_40%'] = $long ? [$current_price - round(($current_price * (40 / $leverage)) / 100, 5), $current_price + round(($current_price * (40 / $leverage)) / 100, 5)] : [$current_price + round(($current_price * (40 / $leverage)) / 100, 5), $current_price - round(($current_price * (40 / $leverage)) / 100, 5)];
-		
+		foreach([[10,10],[10,20],[20,20],[30,30],[30,40],[40,40],[50,50],[60,60],[70,70],[80,80],[90,90],[100,100]] as $lowhigh) {
+			$low = $lowhigh[0];
+			$high = $lowhigh[1];
+			$identifier = $low.'%_'.$high.'%';
+			if($methods == NULL || in_array($identifier, $methods_arr)) {
+				$ret[$identifier] = $long ? [$current_price - round(($current_price * ($low / $leverage)) / 100, 5), $current_price + round(($current_price * ($high / $leverage)) / 100, 5)] : [$current_price + round(($current_price * ($low / $leverage)) / 100, 5), $current_price - round(($current_price * ($high / $leverage)) / 100, 5)];
+			}
+		}
 
 
 		// loop thru pivot types + all of their levels (E.g. R1 S1 up to R3 S3 for fib)
@@ -1406,7 +1403,7 @@ trait Strategies
 				}
 				
 				// perc one way, support or resistance level the other
-				foreach(['2', '4', '8', '12', '20'] as $perc) {
+				foreach(['2', '4', '8', '12', '20', '25', '30', '40', '50', '60', '70', '80', '90','100'] as $perc) {
 					$perc_up_price = $current_price + round(($current_price * ($perc / $leverage)) / 100, 5);
 					$perc_down_price = $current_price - round(($current_price * ($perc / $leverage)) / 100, 5);
 					
@@ -1441,18 +1438,21 @@ trait Strategies
 	 * 
 	 * ... for now use 4% increase/decrease as minimum
 	 */
-	function get_profitable_bounds_methods($current_price, $data, $leverage, $spread, $interval) {
+	function get_profitable_bounds_methods($current_price, $data, $leverage, $spread_price, $interval) {
 		$profitable_long_bounds_methods = $profitable_short_bounds_methods = [];
 //		$spread_price_range = (100 + (float)$spread) * $current_price;
 //		
 //		$long_entry = $current_price - $spread_price_range/2;
 //		$short_entry = $current_price + $spread_price_range/2;
 		
-		$perc = 8;
-		$min_long_take_profit = $current_price + round(($current_price * ($perc / $leverage)) / 100, 6);
-		$max_long_stop_loss = $current_price - round(($current_price * ($perc / $leverage)) / 100, 6);
-		$max_short_take_profit = $current_price - round(($current_price * ($perc / $leverage)) / 100, 6);
-		$min_short_stop_loss = $current_price + round(($current_price * ($perc / $leverage)) / 100, 6);
+//		$perc = 8;
+//		$min_long_take_profit = $current_price + round(($current_price * ($perc / $leverage)) / 100, 6);
+//		$max_long_stop_loss = $current_price - round(($current_price * ($perc / $leverage)) / 100, 6);
+//		$max_short_take_profit = $current_price - round(($current_price * ($perc / $leverage)) / 100, 6);
+//		$min_short_stop_loss = $current_price + round(($current_price * ($perc / $leverage)) / 100, 6);
+		
+		$min_long_take_profit = $min_short_stop_loss = $current_price + ($spread_price * 2);
+		$max_long_stop_loss = $max_short_take_profit = $current_price - ($spread_price * 2);
 		
 		echo "current price: $current_price \n";
 		foreach($this->get_bounds($data, TRUE, $current_price, $leverage) as $bounds_method=>$bounds) {
@@ -1462,39 +1462,37 @@ trait Strategies
 				continue;
 			}
 
-			/*Didn't seem to work....
 			// New idea.. check that loss is never greater then profit as that is probably not such a wise position
 			if(abs($take_profit_long - $current_price) < abs($stop_loss_long - $current_price)) {
-                                echo "\nbounds method: $bounds_method ($interval)...  Skipping, profit less than loss: test: abs(\$take_profit_long - \$current_price) < abs(\$stop_loss_long - \$current_price) (abs($take_profit_long - $current_price) < abs($stop_loss_long - $current_price)) - silly trade? .....continue...";
+				echo "\nbounds method: $bounds_method ($interval)...  Skipping, profit less than loss: test: abs(\$take_profit_long - \$current_price) < abs(\$stop_loss_long - \$current_price) (abs($take_profit_long - $current_price) < abs($stop_loss_long - $current_price)) - silly trade? .....continue...";
 				continue;
-			}*/
+			}
 
 			if($take_profit_long > $min_long_take_profit && $stop_loss_long < $max_long_stop_loss) {
 				echo "\nbounds method: $bounds_method ($interval)... OK! long stop take: $stop_loss_long, $take_profit_long     range: (".($take_profit_long-$stop_loss_long)." )\n";
 				$profitable_long_bounds_methods[$bounds_method] = $bounds;
 			} else {
-                                echo "\nbounds method: $bounds_method ($interval)...  Skipping, profit / loss too small : test failed: \$take_profit_long > \$min_long_take_profit && \$stop_loss_long < \$max_long_stop_loss ($take_profit_long > $min_long_take_profit && $stop_loss_long < $max_long_stop_loss) - silly trade? .....continue...";
+				echo "\nbounds method: $bounds_method ($interval)...  Skipping, profit / loss too small : test failed: \$take_profit_long > \$min_long_take_profit && \$stop_loss_long < \$max_long_stop_loss ($take_profit_long > $min_long_take_profit && $stop_loss_long < $max_long_stop_loss) - silly trade? .....continue...";
 			}
 		}
 		foreach($this->get_bounds($data, FALSE, $current_price, $leverage) as $bounds_method=>$bounds) {
 			list($stop_loss_short, $take_profit_short) = $bounds;
-                        if(empty($stop_loss_short) || empty($take_profit_short)) {
-                                echo "\nbounds method: $bounds_method ($interval)...  Skipping, either take or loss is EMPTY!  short stop take: $stop_loss_short, $take_profit_short  .....continue...";
-                                continue;
-                        }
+			if(empty($stop_loss_short) || empty($take_profit_short)) {
+					echo "\nbounds method: $bounds_method ($interval)...  Skipping, either take or loss is EMPTY!  short stop take: $stop_loss_short, $take_profit_short  .....continue...";
+					continue;
+			}
 
-			/*Didn't seem to work....
-                        // // New idea.. check that loss is never greater then profit as that is probably not such a wise position
+			// New idea.. check that loss is never greater then profit as that is probably not such a wise position
 			if(abs($take_profit_short - $current_price) < abs($stop_loss_short - $current_price)) {
-                                echo "\nbounds method: $bounds_method ($interval)...  Skipping, profit less than loss: test: abs(\$take_profit_short - \$current_price) < abs(\$stop_loss_short - \$current_price)) (abs($take_profit_short - $current_price) < abs($stop_loss_short - $current_price))) - silly trade? .....continue...";
+				echo "\nbounds method: $bounds_method ($interval)...  Skipping, profit less than loss: test: abs(\$take_profit_short - \$current_price) < abs(\$stop_loss_short - \$current_price)) (abs($take_profit_short - $current_price) < abs($stop_loss_short - $current_price))) - silly trade? .....continue...";
 				continue;
-			}*/
+			}
 
 			if($take_profit_short < $max_short_take_profit && $stop_loss_short > $min_short_stop_loss) {
 				echo "\nbounds method: $bounds_method ($interval)...  OK! short stop take: $stop_loss_short, $take_profit_short      range: (".($stop_loss_short-$take_profit_short)." ) \n";
 				$profitable_short_bounds_methods[$bounds_method] = $bounds; 
 			} else {
-                                echo "\nbounds method: $bounds_method ($interval)...  Skipping, profit / loss too small : test failed: \$take_profit_short < \$max_short_take_profit && \$stop_loss_short > \$min_short_stop_loss ($take_profit_short < $max_short_take_profit && $stop_loss_short > $min_short_stop_loss) - silly trade? .....continue...";
+				echo "\nbounds method: $bounds_method ($interval)...  Skipping, profit / loss too small : test failed: \$take_profit_short < \$max_short_take_profit && \$stop_loss_short > \$min_short_stop_loss ($take_profit_short < $max_short_take_profit && $stop_loss_short > $min_short_stop_loss) - silly trade? .....continue...";
 			}
 		}
 		return [$profitable_long_bounds_methods, $profitable_short_bounds_methods];

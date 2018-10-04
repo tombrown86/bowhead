@@ -68,15 +68,18 @@ class TrainTerry2Command extends Command {
 		$cand = new Util\Candles();
 		$ind = new Util\Indicators();
 
-		$interval = '1m';
+		$spread = ['EUR_USD' => 0.01, 'EUR_GBP' => 0.03, 'GBP_USD' => 0.06, /* 'GBP_JPY' => */];
+		$leverage = 222;
+
 		$skip_weekends = TRUE;
 		$results_dir = '/home/tom/results';
 
 //		$instrument_set = ['EUR/GBP', 'GBP/JPY', 'EUR/USD', 'GBP/USD', ];
-		$instrument_set = ['EUR/GBP'];
-		$instrument_set_str = str_replace('/', '_', implode(',', $instrument_set));
+		$instrument_set = ['EUR/USD'];
 
-		$results_filename = $instrument_set_str.'_exactmatches_many_bounds';
+		$instrument_set_str = str_replace('/', '_', implode(',', $instrument_set)) . '_more';
+
+		$results_filename = $instrument_set_str . '_exactmatches_many_bounds';
 
 		$results_obj_filename = $results_filename . '_RESULTS_OBJ';
 
@@ -84,17 +87,17 @@ class TrainTerry2Command extends Command {
 		$list_indicators = array('adx', 'aroonosc', 'cmo', 'sar', 'cci', 'mfi', 'obv', 'stoch', 'rsi', 'macd', 'bollingerBands', 'atr', 'er', 'hli', 'ultosc', 'willr', 'roc', 'stochrsi');
 
 		$skipped = 0;
-		$spread = 0.01; // fixed for now..
-		$leverage = 222;
 
 		$results = [];
 		// note that resuming from file isn't perfect.. it doesn't reload the currently open trades!
 //		$results = (array)json_decode(file_get_contents("$results_dir/$results_obj_filename"), TRUE); // (rememeber to update $start_min !)
 
-		foreach($instrument_set as $instrument){
+		foreach ($instrument_set as $instrument) {
 			$results = [];
 			$end_min = strtotime('2017-01-01 00:00:00');
-			$start_min = strtotime('2015-01-03 00:00:00'); 
+			$start_min = strtotime('2015-01-03 00:00:00');
+			$ispread = $spread[str_replace('/', '_', $instrument)];
+
 
 			$strategy_open_position = [];
 
@@ -130,7 +133,7 @@ class TrainTerry2Command extends Command {
 
 					$win_or_lose_short = $win_or_lose_long = []; //keep results here as we have multiple strats to check 
 
-					echo get_class($this)." - $instrument: get recent data, get $periods_to_get periods of $interval data..";
+					echo get_class($this) . " - $instrument: get recent data, get $periods_to_get periods of $interval data..";
 					$data = $this->getRecentData($instrument, $periods_to_get, false, date('H'), $interval, false, $min, false);
 
 					if (count($data['periods']) < $periods_to_get) {
@@ -177,12 +180,13 @@ class TrainTerry2Command extends Command {
 						}
 					}
 
-					list($profitable_long_bounds_methods, $profitable_short_bounds_methods) = $this->get_profitable_bounds_methods($current_price, $data, $leverage, $spread, $interval);
+					$spread_price = $ispread * $current_price / 100;
+					list($profitable_long_bounds_methods, $profitable_short_bounds_methods) = $this->get_profitable_bounds_methods($current_price, $data, $leverage, $spread_price, $interval);
 					$bounds_methods = array_merge(array_keys($profitable_long_bounds_methods), array_keys($profitable_short_bounds_methods));
 
 					// TODO: rewrite logic for updated technique! 
 					// slightly hacked for now.. for terry 2, indicator combinations will only have a size of 1 or 2 (for long, short or long and short)
-					foreach ($indicator_combinations as $overbought_or_underbought => $indicators) { 
+					foreach ($indicator_combinations as $overbought_or_underbought => $indicators) {
 						$strategy_name = $interval;
 						foreach ($indicators as $indicator_name) {
 							$strategy_name .= '_' . $indicator_name;
@@ -208,34 +212,34 @@ class TrainTerry2Command extends Command {
 								}
 
 
-                        		                        if (in_array($bounds_strategy_name, $strategy_open_position)) {
-                	                	                        continue;
-		                                                }
+								if (in_array($bounds_strategy_name, $strategy_open_position)) {
+									continue;
+								}
 
 
-								$endmin = $min + (2 * 60 * 60);
+								$endmin = $min + (24 * 60 * 60);
 
 								// check if bounds were profitable.... if so, get bounds and see if it wins
 								if ($long) {
-									if(!array_key_exists($bounds_method, $profitable_long_bounds_methods)) {
+									if (!array_key_exists($bounds_method, $profitable_long_bounds_methods)) {
 										//echo "\n not profitable bounds method ($bounds_method) ";
 										continue;
 									} else {
 										list($stop, $take) = $profitable_long_bounds_methods[$bounds_method];
 									}
 									if (!isset($win_or_lose_long[$bounds_method])) {
-										$win_or_lose_long[$bounds_method] = $this->getWinOrLoose($instrument, $min, $endmin, TRUE, $take, $stop, $current_price, $leverage, $spread);
+										$win_or_lose_long[$bounds_method] = $this->getWinOrLose($instrument, $min, $endmin, TRUE, $take, $stop, $current_price, $leverage, $ispread);
 									}
 									$result = $win_or_lose_long[$bounds_method];
 								} else {
-									if(!array_key_exists($bounds_method, $profitable_short_bounds_methods)) {
+									if (!array_key_exists($bounds_method, $profitable_short_bounds_methods)) {
 										//echo "\n not profitable bounds method ($bounds_method) ";
 										continue;
 									} else {
 										list($stop, $take) = $profitable_short_bounds_methods[$bounds_method];
 									}
 									if (!isset($win_or_lose_short[$bounds_method])) {
-										$win_or_lose_short[$bounds_method] = $this->getWinOrLoose($instrument, $min, $endmin, FALSE, $take, $stop, $current_price, $leverage, $spread);
+										$win_or_lose_short[$bounds_method] = $this->getWinOrLose($instrument, $min, $endmin, FALSE, $take, $stop, $current_price, $leverage, $ispread);
 									}
 									$result = $win_or_lose_short[$bounds_method];
 								}
@@ -266,7 +270,7 @@ class TrainTerry2Command extends Command {
 												'avg_long_profit' => 0,
 												'avg_short_profit' => 0,
 												'avg_profit' => 0,
-												'candle_strength' => 1/*$candle_strength*/,
+												'candle_strength' => 1/* $candle_strength */,
 												'interval' => $interval,
 													/* these will be created as necessary
 													  'long_correct_candle' => [],
@@ -333,12 +337,12 @@ class TrainTerry2Command extends Command {
 					}
 				}
 
-				
+
 				// compile result report.. print, put in knowledge table, etc
 				if (!($min % 86400) || $min == $end_min) {
 					$percs = [];
 					foreach ($results as $strategy_name => $data) {
-	//					// get candle + trend % successes and fails, including their use as anti signals
+						//					// get candle + trend % successes and fails, including their use as anti signals
 						foreach (['candle', 'inverse_candle', 'trend', 'inverse_trend'] as $cot) {
 							foreach (['long', 'short'] as $los) {
 								$key_correct = $los . '_correct_' . $cot;
@@ -404,7 +408,7 @@ class TrainTerry2Command extends Command {
 				if (!($min % 1296000/* 15 days */) || $min == $end_min) {
 					// store results obj JSON occasionally, so this process can be resumed, in theory
 					file_put_contents("$results_dir/$results_obj_filename", json_encode($results));
-					file_put_contents("$results_dir/$results_obj_filename"."_time", date('Y-m-d H:i:s',$min));
+					file_put_contents("$results_dir/$results_obj_filename" . "_time", date('Y-m-d H:i:s', $min));
 					foreach ($results as $result) {
 
 						$days_of_data = ($min - $start_min) / 60 * 60 * 24;
@@ -433,7 +437,7 @@ class TrainTerry2Command extends Command {
 							, 'candle_strength' => @$result['candle_strength']
 							, 'interval' => @$result['interval']
 						];
-	//					print_r($data);die;
+						//					print_r($data);die;
 						$terry_strategy_knowledge::updateOrCreate($unique_fields, $data);
 					}
 				}

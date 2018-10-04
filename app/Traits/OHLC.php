@@ -449,12 +449,37 @@ trait OHLC {
 		return $ret;
 	}
 
-	public function getWinOrLoose($instrument, $time, $etime, $long, $take, $stop, $entry = NULL, $leverage = 1, $spread = 0) {
+	
+	
+	public function winOrLoseTest() {
+		$wc_trades = \Bowhead\Models\wc_trade::all();
+		
+		$out = [];
+		foreach($wc_trades as $wc_trade) {
+			$wc_trade = $wc_trade->toArray();
+			
+			$created_at = $wc_trade['created_at'];
+			$long = $wc_trade['direction'] != 'sell';
+			
+			$wc_trade['OPEN HRS'] = ($wc_trade['closed_at']-$wc_trade['entered_at'])/3600;
+			$wc_trade['% PROFIT'] = ($long ? 100 : -100) * $wc_trade['close_price'] / $wc_trade['entry_price'];
+			
+			print_r($wc_trade);
+			print_r($this->getWinOrLose(str_replace('-','_',$wc_trade['market']), $created_at, $created_at + 24*60*60, $long, $wc_trade['take_profit'], $wc_trade['stop_loss'], $wc_trade['entry_price'], 222, 0.1));
+			echo "\n\n\n---------------------\n\n";
+		}
+		
+//		print_r($out);
+		die;
+		//return $this->getWinOrLose('GBP_USD', $time, $time + 24*60*60, 0, 1.3228000000, 1.3222900000, 1.3228000000, $leverage = 222, 0.1);
+	}
+	
+	public function getWinOrLose($instrument, $time, $etime, $long, $take, $stop, $entry = NULL, $leverage = 1, $spread_perc = 0) {
 		// if I understand this right, we lose ~ half spread on entry (due to cost to buy/sell) .. effectively offsetting our entry position
 		// The take and stop loss values used to calc the profit are not adjusted, instead the TP or SL won't trigger until we hit actual price +/- remaining spread adjustment
-		$adjusted_entry = $entry ? ($long ? ($entry / 100) * (100 + ($spread / 2)) : ($entry / 100) * (100 - ($spread / 2))) : NULL;
-		$adjusted_take = $long ? ($take / 100) * (100 + ($spread / 2)) : ($take / 100) * (100 - ($spread / 2));
-		$adjusted_stop = $long ? ($stop / 100) * (100 - ($spread / 2)) : ($stop / 100) * (100 + ($spread / 2));
+		$adjusted_entry = $entry ? ($long ? ($entry / 100) * (100 + ($spread_perc / 2)) : ($entry / 100) * (100 - ($spread_perc / 2))) : NULL;
+		$adjusted_take = $long ? ($take / 100) * (100 + ($spread_perc / 2)) : ($take / 100) * (100 - ($spread_perc / 2));
+		$adjusted_stop = $long ? ($stop / 100) * (100 - ($spread_perc / 2)) : ($stop / 100) * (100 + ($spread_perc / 2));
 
 		$table = 'bowhead_ohlc_tick';
 		if((int)$time < strtotime('2018-02-01 00:00:00')) { //// (I did some table sharding for my training dataset)
@@ -479,9 +504,17 @@ trait OHLC {
 				->orderBy('ctime')
 				->limit(1)
 				->get();
+				
+		// Temp: Added financing (experiment) based on WC rules
+		$financing_perc = 0.05;
+		$hours = floor(($etime - $time + 3600/2/*add half hr ass avg opening time*/)/3600);
+		$financing_cost = ($financing_perc/100) * $hours / 24;
+		
 		foreach ($outcome_resultset as $outcome) {
-			$win = !($long ? $outcome->low < $adjusted_stop : $outcome->high > $adjusted_stop);
-			$percentage_profit = empty($adjusted_entry) ? NULL : $leverage * (((($win ? abs($take - $adjusted_entry) : -abs($stop - $adjusted_entry)) / $adjusted_entry) * 100));
+			$win = !($long ? (float)$outcome->low <= $adjusted_stop : (float)$outcome->high >= $adjusted_stop);
+						
+			$profit = ($win ? abs($take - $adjusted_entry) : -abs($stop - $adjusted_entry)) - $financing_cost;
+			$percentage_profit = empty($adjusted_entry) ? NULL : $leverage * ((($profit / $adjusted_entry) * 100));
 
 			return [
 				'win' => $win,
@@ -491,9 +524,10 @@ trait OHLC {
 		}
 
 		return [
+			'timeout' => true,
 			'win' => false,
 			'time' => $etime,
-			'percentage_profit' => empty($adjusted_entry) ? NULL : -$leverage * (abs($stop - $adjusted_entry) / $adjusted_entry) * 100,
+			'percentage_profit' => empty($adjusted_entry) ? NULL : -$leverage * ((abs($stop - $adjusted_entry) + $financing_cost) / $adjusted_entry) * 100,
 		];
 	}
 

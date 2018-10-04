@@ -106,14 +106,14 @@ class RecordSuccessCommand extends Command {
 
 				$row = [];
                                 
-				$result_long_100th = $this->getWinOrLoose('BTC/USD', $min, $endmin, TRUE, $current_price + (($current_price / 100)*1) , $current_price - (($current_price / 100)*1));
-				$result_short_100th = $this->getWinOrLoose('BTC/USD', $min, $endmin, FALSE, $current_price - (($current_price / 100)*1), $current_price + (($current_price / 100)*1)); 
+				$result_long_100th = $this->getWinOrLose('BTC/USD', $min, $endmin, TRUE, $current_price + (($current_price / 100)*1) , $current_price - (($current_price / 100)*1));
+				$result_short_100th = $this->getWinOrLose('BTC/USD', $min, $endmin, FALSE, $current_price - (($current_price / 100)*1), $current_price + (($current_price / 100)*1)); 
 
-				$result_long_80th = $this->getWinOrLoose('BTC/USD', $min, $endmin, TRUE, $current_price + (($current_price / 80)*1), $current_price - (($current_price / 80)*1));
-				$result_short_80th = $this->getWinOrLoose('BTC/USD', $min, $endmin, FALSE, $current_price - (($current_price / 80)*1), $current_price + (($current_price / 80)*1)); 
+				$result_long_80th = $this->getWinOrLose('BTC/USD', $min, $endmin, TRUE, $current_price + (($current_price / 80)*1), $current_price - (($current_price / 80)*1));
+				$result_short_80th = $this->getWinOrLose('BTC/USD', $min, $endmin, FALSE, $current_price - (($current_price / 80)*1), $current_price + (($current_price / 80)*1)); 
 
-				$result_long_60th = $this->getWinOrLoose('BTC/USD', $min, $endmin, TRUE, $current_price + (($current_price / 60)*1), $current_price - (($current_price / 60)*1));
-				$result_short_60th = $this->getWinOrLoose('BTC/USD', $min, $endmin, FALSE, $current_price - (($current_price / 60)*1), $current_price + (($current_price / 60)*1));
+				$result_long_60th = $this->getWinOrLose('BTC/USD', $min, $endmin, TRUE, $current_price + (($current_price / 60)*1), $current_price - (($current_price / 60)*1));
+				$result_short_60th = $this->getWinOrLose('BTC/USD', $min, $endmin, FALSE, $current_price - (($current_price / 60)*1), $current_price + (($current_price / 60)*1));
 
 
 				$row = [
@@ -178,7 +178,7 @@ class RecordSuccessCommand extends Command {
 										$stop   = $current_price - (($current_price / 100)*1);
 									}
 									
-									$result = $this->getWinOrLoose('BTC/USD', $min, $endmin, $long, $take, $stop);
+									$result = $this->getWinOrLose('BTC/USD', $min, $endmin, $long, $take, $stop);
 
 									// keep note of end time for this trade.
 									$strategy_open_position[$strategy_name] = $result['time'];
