@@ -23,6 +23,7 @@ class CreateWcTrade extends Migration {
                         $table->string('state', 10)->index('state1');
                         $table->integer('size')->index('size1');
                         $table->integer('margin_size')->index('margin_size1');
+                        $table->decimal('current_price', 20, 10)->index('current_price1');
                         $table->decimal('entry_price', 20, 10)->index('entry_price1');
                         $table->decimal('take_profit', 20, 10)->index('take_profit1');
                         $table->decimal('stop_loss', 20, 10)->index('stop_loss1');

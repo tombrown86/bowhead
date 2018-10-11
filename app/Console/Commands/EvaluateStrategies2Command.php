@@ -174,7 +174,7 @@ class EvaluateStrategies2Command extends Command {
 							$amt_stoploss   = ($direction == 'long' ? ((float)$price - $sl) : ((float)$price + $sl));
 
 							
-							$result = $this->getWinOrLose($instrument, $min, $endmin, $long, $amt_takeprofit, $amt_stoploss);
+							$result = $this->getWinOrLoseWC($instrument, $min, $endmin, $long, $amt_takeprofit, $amt_stoploss);
 							
 
 							// keep note of end time for this trade.

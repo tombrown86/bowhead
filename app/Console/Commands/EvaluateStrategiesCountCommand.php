@@ -214,12 +214,12 @@ class EvaluateStrategiesCountCommand extends Command {
 
 					if ($long) {
 						if (!$win_or_lose_long) {
-							$win_or_lose_long = $this->getWinOrLose('EUR/USD', $min, $endmin, TRUE, $take, $stop);
+							$win_or_lose_long = $this->getWinOrLoseWC('EUR/USD', $min, $endmin, TRUE, $take, $stop);
 						}
 						$result = $win_or_lose_long;
 					} else {
 						if (!$win_or_lose_short) {
-							$win_or_lose_short = $this->getWinOrLose('EUR/USD', $min, $endmin, FALSE, $take, $stop);
+							$win_or_lose_short = $this->getWinOrLoseWC('EUR/USD', $min, $endmin, FALSE, $take, $stop);
 						}
 						$result = $win_or_lose_short;
 					}

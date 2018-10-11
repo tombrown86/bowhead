@@ -7,9 +7,6 @@ use Illuminate\Console\Command;
 use Bowhead\Util;
 use Bowhead\Traits\OHLC;
 
-
-
-
 class ForexTesterBackfillCommand extends Command {
 
 	use OHLC;
@@ -58,10 +55,9 @@ class ForexTesterBackfillCommand extends Command {
 	}
 
 	public function handle() {
-		ini_set('memory_limit','4G');
+		ini_set('memory_limit', '4G');
 		$this->console = $util = new Console();
 		// data from :  http://www.forexrate.co.uk/forexhistoricaldata.php
-
 #		foreach (glob('/home/terry/forexdata/*.csv') as $path) {
 #			$handle = fopen($path, "r");
 #			$filename = basename($path);
@@ -79,49 +75,49 @@ class ForexTesterBackfillCommand extends Command {
 //				if($datetime < strtotime('2017-03-26 00:00:00') || $datetime > strtotime('2017-03-26 03:00:00')) {
 
 
-		for($year = 2015; $year < 2019; $year++) {
-			for($week = 1; $week < 54; $week++) {
-				$path = '/home/tom/forexdata/fxcm/csv/'.$year.'_'.$week.'.csv';
-				if(!file_exists($path)) {
+		for ($year = 2015; $year < 2019; $year++) {
+			for ($week = 1; $week < 54; $week++) {
+				$path = '/home/tom/forexdata/fxcm/csv/' . $year . '_' . $week . '.csv';
+				if (!file_exists($path)) {
 					echo "File does not exist ($path).. just skipping..";
 				} else {
 					$handle = fopen($path, "r");
 					$data = [];
-					while(($line = fgets($handle)) !== false)  {
+					while (($line = fgets($handle)) !== false) {
 						$line = str_replace("\x00", '', $line); // clear the weird NULL chars from this data
-						preg_match('/(\d\d\/\d\d\/\d\d\d\d \d\d\:\d\d\:\d\d)\.(\d*),([\d\.]*),([\d\.]*)/i', $line."\n", $matches);
-						if(count($matches) == 5) {
+						preg_match('/(\d\d\/\d\d\/\d\d\d\d \d\d\:\d\d\:\d\d)\.(\d*),([\d\.]*),([\d\.]*)/i', $line . "\n", $matches);
+						if (count($matches) == 5) {
 							$date_str = date('Y-m-d H:i:00', strtotime($matches[1]));
 							$data[strtotime($date_str)][] = [$matches[3], trim($matches[4])];
 						}// just skip lines which don't match... (empty lines or heading line?)
 					}
 					fclose($handle);
-					
-					foreach($data as $time=>$bas) {
+
+					foreach ($data as $time => $bas) {
 						$h = $c = 0;
 						$l = 99999999;
 						$o = ($bas[0][0] + $bas[0][1]) / 2;
-						foreach($bas as $i=>$ba) {
+						foreach ($bas as $i => $ba) {
 							$price = ($bas[$i][0] + $bas[$i][1]) / 2;
-							$h = $price > $h  ? $price : $h;
-                                                        $l = $price < $l  ? $price : $l;
+							$h = $price > $h ? $price : $h;
+							$l = $price < $l ? $price : $l;
 							$c = $price;
 						}
 
 						$date = date('Y-m-d H:i:s', $time);
 						echo "$date ($time) \n";
-							$row = [
-								'ctime' => $date
-								, 'timeid' => date('YmdHis', ($time))
-								, 'open' => $o
-								, 'high' => $h
-								, 'low' => $l
-								, 'close' => $c
-								, 'volume' => 0
-								, 'volume2' => 0
-							];
-	//						print_r($row);die;
-							$this->markOHLC($row, 'raw', 'GBP/JPY');
+						$row = [
+							'ctime' => $date
+							, 'timeid' => date('YmdHis', ($time))
+							, 'open' => $o
+							, 'high' => $h
+							, 'low' => $l
+							, 'close' => $c
+							, 'volume' => 0
+							, 'volume2' => 0
+						];
+						//						print_r($row);die;
+						$this->markOHLC($row, 'raw', 'GBP/JPY');
 					}
 				}
 			}

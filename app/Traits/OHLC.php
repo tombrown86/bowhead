@@ -462,10 +462,13 @@ trait OHLC {
 			$long = $wc_trade['direction'] != 'sell';
 			
 			$wc_trade['OPEN HRS'] = ($wc_trade['closed_at']-$wc_trade['entered_at'])/3600;
-			$wc_trade['% PROFIT'] = ($long ? 100 : -100) * $wc_trade['close_price'] / $wc_trade['entry_price'];
+//			$wc_trade['% PROFIT'] = ($long ? 100 : -100) * $wc_trade['close_price'] / $wc_trade['entry_price'];
+			
+			$spread = ['EUR_USD' => 0.01, 'EUR_GBP' => 0.03, 'GBP_USD' => 0.06, /* 'GBP_JPY' => */];
+			$spread = $spread[str_replace('-','_',$wc_trade['market'])];
 			
 			print_r($wc_trade);
-			print_r($this->getWinOrLose(str_replace('-','_',$wc_trade['market']), $created_at, $created_at + 24*60*60, $long, $wc_trade['take_profit'], $wc_trade['stop_loss'], $wc_trade['entry_price'], 222, 0.1));
+			print_r($this->getWinOrLoseWC(str_replace('-','_',$wc_trade['market']), $created_at, $created_at + 24*60*60, $long, $wc_trade['take_profit'], $wc_trade['stop_loss'], $wc_trade['entry_price']/*$wc_trade['current_price']*/, 222, $spread));
 			echo "\n\n\n---------------------\n\n";
 		}
 		
@@ -517,7 +520,7 @@ trait OHLC {
 			$percentage_profit = empty($adjusted_entry) ? NULL : $leverage * ((($profit / $adjusted_entry) * 100));
 
 			return [
-				'win' => $win,
+				'win' => $profit > 0, // finance costs may make a "$win" actually a lose,
 				'time' => strtotime($outcome->ctime),
 				'percentage_profit' => $percentage_profit,
 			];
@@ -529,6 +532,88 @@ trait OHLC {
 			'time' => $etime,
 			'percentage_profit' => empty($adjusted_entry) ? NULL : -$leverage * ((abs($stop - $adjusted_entry) + $financing_cost) / $adjusted_entry) * 100,
 		];
+	}
+
+
+
+	public function getWinOrLoseWC($instrument, $time, $etime, $long, $take, $stop, $entry = NULL, $leverage = 1, $spread_perc = 0) {
+		$adjusted_entry = $entry ? ($long ? $entry + ($entry * $spread_perc / 100) : $entry - ($entry * $spread_perc / 100)) : NULL;
+//		$adjusted_entry = $entry;//TEMP REMOVE
+		
+		// must adjust this more!
+		$lose_spread = 0.012; // average realistic spread for losing trade!
+		$expected_stop_close = $long ? $stop - ($stop * $lose_spread / 100) : $stop + ($stop * $lose_spread / 100);
+		$expected_stop_exit = $long ? $expected_stop_close + ($expected_stop_close * $spread_perc / (2*100)) : $expected_stop_close - ($expected_stop_close * $spread_perc / (2*100));
+		// not sure if also need to deduct half spread for realistic exit even with lose spread!
+
+		$expected_take_close = $take;
+		$expected_take_exit = $long ? $take + ($take * $spread_perc / (2*100)) : $take - ($take * $spread_perc / (2*100));
+
+		print_r("\n\$entry: ".$entry);
+		print_r("\n\$spread_perc: ".$spread_perc);
+		print_r("\n\$adjusted_entry: ".$adjusted_entry);
+		print_r("\n\$expected_stop_close: ".$expected_stop_close);
+		print_r("\n\$expected_stop_exit: ".$expected_stop_exit);
+		print_r("\n\$expected_take_close: ".$expected_take_close);
+		print_r("\n\$expected_take_exit: ".$expected_take_exit);
+
+		$table = 'bowhead_ohlc_tick';
+		if((int)$time < strtotime('2018-02-01 00:00:00')) { //// (I did some table sharding for my training dataset)
+			if($instrument == 'EUR/USD')
+				$table .= '_eurusd';
+			if($instrument == 'GBP/USD')
+				$table .= '_gbpusd';
+			if($instrument == 'GBP/JPY')
+				$table .= '_gbpjpy';
+			if($instrument == 'EUR/GBP')
+				$table .= '_eurgbp';
+		}
+		
+		$outcome_resultset = \DB::table($table)->select(DB::raw('*'))
+				->where('instrument', $instrument)
+				->where('ctime', '>', date('Y-m-d H:i:s', $time))
+				->where('ctime', '<', date('Y-m-d H:i:s', $etime))
+				->where(function($q) use ($long, $expected_take_exit, $expected_stop_exit) {
+					$q->where('high', '>=', $long ? $expected_take_exit : $expected_stop_exit)
+					->orWhere('low', '<=', $long ? $expected_stop_exit : $expected_take_exit);
+				})
+				->orderBy('ctime')
+				->limit(1)
+				->get();
+
+		// Temp: Added financing (experiment) based on WC rules
+		$size = 10000;
+		$financing_perc = 0.05;
+		$hours = floor(($etime - $time + 3600/2/*add half hr ass avg opening time*/)/3600);
+		$financing_cost = 0;//($financing_perc/100) * $hours / 24;
+
+		foreach ($outcome_resultset as $outcome) {
+			$win = !($long ? (float)$outcome->low <= $expected_stop_exit : (float)$outcome->high >= $expected_stop_exit);
+			$close = $win ? $expected_take_close : $expected_stop_close;
+			$profit = ((($close-$adjusted_entry)/$adjusted_entry)*100*$leverage/$size/$size) * ($long ? 1 : -1);
+			$profit -= $financing_cost;
+			$percentage_profit = $profit * $size * $size;
+
+			return [
+				'win' => $profit > 0, // finance costs may make a "$win" actually a lose,
+				'time' => strtotime($outcome->ctime),
+				'profit' => $profit,
+				'percentage_profit' => $percentage_profit,
+			];
+		}
+
+                $close = $expected_stop_close;
+                $profit = (($close-$adjusted_entry)/$adjusted_entry)*100*$leverage/$size/$size * ($long ? 1 : -1);
+		$profit -= $financing_cost;
+
+		return [
+			'timeout' => true,
+			'win' => false,
+			'time' => $etime,
+			'profit' => $profit,
+			'percentage_profit' => $profit * $size * $size,
+		];
+
 	}
 
 	/**

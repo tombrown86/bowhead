@@ -77,7 +77,7 @@ class TrainTerry2Command extends Command {
 //		$instrument_set = ['EUR/GBP', 'GBP/JPY', 'EUR/USD', 'GBP/USD', ];
 		$instrument_set = ['EUR/USD'];
 
-		$instrument_set_str = str_replace('/', '_', implode(',', $instrument_set)) . '_more';
+		$instrument_set_str = str_replace('/', '_', implode(',', $instrument_set));
 
 		$results_filename = $instrument_set_str . '_exactmatches_many_bounds';
 
@@ -228,7 +228,7 @@ class TrainTerry2Command extends Command {
 										list($stop, $take) = $profitable_long_bounds_methods[$bounds_method];
 									}
 									if (!isset($win_or_lose_long[$bounds_method])) {
-										$win_or_lose_long[$bounds_method] = $this->getWinOrLose($instrument, $min, $endmin, TRUE, $take, $stop, $current_price, $leverage, $ispread);
+										$win_or_lose_long[$bounds_method] = $this->getWinOrLoseWC($instrument, $min, $endmin, TRUE, $take, $stop, $current_price, $leverage, $ispread);
 									}
 									$result = $win_or_lose_long[$bounds_method];
 								} else {
@@ -239,7 +239,7 @@ class TrainTerry2Command extends Command {
 										list($stop, $take) = $profitable_short_bounds_methods[$bounds_method];
 									}
 									if (!isset($win_or_lose_short[$bounds_method])) {
-										$win_or_lose_short[$bounds_method] = $this->getWinOrLose($instrument, $min, $endmin, FALSE, $take, $stop, $current_price, $leverage, $ispread);
+										$win_or_lose_short[$bounds_method] = $this->getWinOrLoseWC($instrument, $min, $endmin, FALSE, $take, $stop, $current_price, $leverage, $ispread);
 									}
 									$result = $win_or_lose_short[$bounds_method];
 								}

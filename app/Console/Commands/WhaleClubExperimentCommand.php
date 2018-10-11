@@ -89,7 +89,7 @@ class WhaleClubExperimentCommand extends Command {
 		$skipped = 0;
 		$skip_weekends = FALSE;
 
-		$data_min_datetime = '2018-10-01 16:00:02'; #  '0000-00-00 00:00:00';
+		$data_min_datetime = '2018-10-08 11:30:02'; #  '0000-00-00 00:00:00';
 		$leverage = 222;
 //		$spread = ['EUR_USD' => 0.02, 'EUR_GBP' => 0.03, 'GBP_USD' => 0.06,/* 'GBP_JPY' => */];
 
@@ -133,6 +133,7 @@ class WhaleClubExperimentCommand extends Command {
 						$wc_result->terry_signal = $terry_tip['signal'];
 						$wc_result->terry_info = $terry_tip['info'];
 						$wc_result->terry_strategy_knowledge_id = $terry_tip['knowledge_row']->id;
+						$wc_result->current_price = $pos['current_price'];
 						$wc_result->save();
 						unset($this->positions[$instrument][$i]);
 					}
@@ -285,6 +286,7 @@ class WhaleClubExperimentCommand extends Command {
 								if (isset($position['entered_at'])) {
 									file_put_contents('/home/tom/results/wc_experiment_' . date('Y-m-d'), "$instrument position created!:\n" . print_r([$order, ['position' => $position, 'terry tip' => $result]], 1) . "\n" . print_r($position, 1) . "\n-----------------------", FILE_APPEND);
 									$position['terry_tip'] = $result;
+									$position['current_price'] = $current_price;
 									isset($this->positions[$instrument]) || $this->positions[$instrument] = [];
 									$this->positions[$instrument][] = $position;
 									$this->mailer($direction > 0 ? 'Going long' : 'Going short', ['position' => $position, 'terry tip' => $result]);

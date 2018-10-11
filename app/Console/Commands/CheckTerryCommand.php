@@ -60,7 +60,7 @@ class CheckTerryCommand extends Command {
 		$results = [];
 
 		
-		$spread = ['EUR_USD' => 0.02, 'EUR_GBP' => 0.03, 'GBP_USD' => 0.06, /* 'GBP_JPY' => */];
+		$spread = ['EUR_USD' => 0.01, 'EUR_GBP' => 0.03, 'GBP_USD' => 0.06, /* 'GBP_JPY' => */];
 		$spread = $spread[str_replace('/', '_', $instrument)];
 
 		$strategy_open_position = [];
@@ -172,12 +172,12 @@ class CheckTerryCommand extends Command {
 
 					if ($long) {
 						if (!isset($win_or_lose_long[$terry_result['bounds_method']])) {
-							$win_or_lose_long[$terry_result['bounds_method']] = $this->getWinOrLose($instrument, $min, $endmin, TRUE, $take, $stop, $current_price, $leverage, $spread);
+							$win_or_lose_long[$terry_result['bounds_method']] = $this->getWinOrLoseWC($instrument, $min, $endmin, TRUE, $take, $stop, $current_price, $leverage, $spread);
 						}
 						$result = $win_or_lose_long[$terry_result['bounds_method']];
 					} else {
 						if (!isset($win_or_lose_short[$terry_result['bounds_method']])) {
-							$win_or_lose_short[$terry_result['bounds_method']] = $this->getWinOrLose($instrument, $min, $endmin, FALSE, $take, $stop, $current_price, $leverage, $spread);
+							$win_or_lose_short[$terry_result['bounds_method']] = $this->getWinOrLoseWC($instrument, $min, $endmin, FALSE, $take, $stop, $current_price, $leverage, $spread);
 						}
 						$result = $win_or_lose_short[$terry_result['bounds_method']];
 					}
